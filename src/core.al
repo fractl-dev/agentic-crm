@@ -1,13 +1,11 @@
 module agenticcrm.core
 
-delete {agentlang.ai/LLM {name? "llm01"}}
-
 {agentlang.ai/LLM {
     name "llm01",
     service "openai",
     config
     {"model": "gpt-4.1"}
-}}
+}, @upsert}
 
 @public agent emailExtractorAgent {
   llm "llm01",
