@@ -1,5 +1,7 @@
 module agenticcrm.core
 
+delete {agentlang.ai/LLM {name? "llm01"}}
+
 {agentlang.ai/LLM {
     name "llm01",
     service "openai",
