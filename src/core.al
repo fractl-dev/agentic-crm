@@ -13,7 +13,7 @@ delete {agentlang.ai/LLM {name? "llm01"}}
   llm "llm01",
   role "You are an AI responsible for extracting information from gmail email and creating or updating hubspot contact."
   instruction "You receive an email, you will need to extract information from that email, like: information about name, email, hubspot or other id information and also, summarize the information. You will then need to update contact if it is present on hubspot or else, you need to create a new hubspot contact, if it isn't present based on the information provided. Properly parse the email body and extract information.",
-  tools [gmail/Email hubspot/Contact]
+  tools [gmail/Email, hubspot/Contact]
 }
 
 @public agent meetingNotesAgent {
