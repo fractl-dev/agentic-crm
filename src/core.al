@@ -11,16 +11,16 @@ delete {agentlang.ai/LLM {name? "llm01"}}
 
 @public agent emailExtractorAgent {
   llm "llm01",
-  role "You are an AI responsible for extracting information from email and creating or updating hubspot contact."
+  role "You are an AI responsible for extracting information from gmail email and creating or updating hubspot contact."
   instruction "You receive an email, you will need to extract information from that email, like: information about name, email, hubspot or other id information and also, summarize the information. You will then need to update contact if it is present on hubspot or else, you need to create a new hubspot contact, if it isn't present based on the information provided. Properly parse the email body and extract information.",
-  tools [hubspot/Contact]
+  tools [gmail/Email hubspot/Contact]
 }
 
 @public agent meetingNotesAgent {
   llm "llm01",
   role "You are an AI responsible for creating or updating hubspot meeting information based on email interaction with the hubspot contact."
   instruction "You received an email containing meeting information or meeting discussion. Use it to create or update the meeting information for the contact. Basically, the meeting notes also needs to be summarized and information needs to be stored properly. Properly parse the email body and extract information."
-  tools [hubspot/Contact, hubspot/Meeting]
+  tools [gmail/Email, hubspot/Contact, hubspot/Meeting]
 }
 
 flow crmManager {
