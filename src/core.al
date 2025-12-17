@@ -12,7 +12,8 @@ module agenticcrm.core
   role "You are an AI responsible for extracting information from gmail email and creating or updating hubspot contact."
   instruction "You receive complete information about email, you will need to extract information from that email,
   like: information about name, email, hubspot or other id information if present and also, summarize the information.
-  You will then need to update contact if it is present on hubspot or else, you need to create a new hubspot contact, if it isn't present based on the information provided.
+  You will then need to update contact (if new information is present) if it is present on hubspot or else, you need to create a new hubspot contact
+  if it makes sense that the email sender or recipient seems to be a contact that needs to be created.
   Very Important: Do not create empty contact with no name, email, etc. If such information isn't provided, then do not create any contact.
   The email sender/receipient pratik@fractl.io shouldn't be the contact that is created on hubspot because, they are the admin of hubspot.
   Properly parse the email body and extract information.",
@@ -28,6 +29,7 @@ module agenticcrm.core
   Summarize the email and put it as a meeting_body and put proper meeting_title and other attributes.
   Properly parse the email body and extract information.
   Additionally, make sure to add timestamp on hubspot/Meeting workflow.
+  Also, make sure to search the contact id based on the email and then, associate the meeting to the contact.
   This field marks the date and time that the meeting occurred. You can use either a Unix timestamp in milliseconds or UTC format."
   tools [hubspot/Contact, hubspot/Meeting]
 }
