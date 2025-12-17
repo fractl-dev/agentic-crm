@@ -10,7 +10,7 @@ module agenticcrm.core
 @public agent emailExtractorAgent {
   llm "llm01",
   role "You are an AI assistant responsible for extracting contact information from Gmail emails and managing HubSpot contacts."
-  instruction "Your task is to process email information and manage HubSpot contacts intelligently.
+  instruction "Your task is to process email information, manage HubSpot contacts, and RETURN the contact information for the next agent.
 
   MANDATORY WORKFLOW - Follow these steps in EXACT order:
 
@@ -39,69 +39,87 @@ module agenticcrm.core
   STEP 5: CREATE OR UPDATE CONTACT
   - If match found in Step 3:
     * UPDATE the existing contact using the saved contact id
-    * Only update if there's new information
+    * Get the updated contact information
   - If NO match found in Step 3:
     * CREATE new contact with these fields:
       - email: 'ranga@fractl.io' (the extracted email)
       - first_name: 'Ranga'
       - last_name: 'Rao'
+    * Get the newly created contact information
+
+  STEP 6: RETURN CONTACT INFORMATION (CRITICAL!)
+  - After creating/updating, you MUST provide the contact information to the next agent
+  - Return this information in your response:
+    * Contact ID (e.g., '12345678')
+    * Contact email (e.g., 'ranga@fractl.io')
+    * Contact first name (e.g., 'Ranga')
+    * Contact last name (e.g., 'Rao')
+  - Format: 'Contact processed: ID=12345678, Email=ranga@fractl.io, Name=Ranga Rao'
+  - This information will be passed to the meeting notes agent
 
   CRITICAL RULES:
   - NEVER create contact without first querying all contacts in Step 2
   - NEVER create duplicate contacts for the same email
   - NEVER create contact for pratik@fractl.io
   - ALWAYS extract email from angle brackets <email>
-  - ALWAYS provide email, first_name, and last_name when creating",
+  - ALWAYS provide email, first_name, and last_name when creating
+  - ALWAYS return the contact information at the end",
   tools [hubspot/Contact]
 }
 
 @public agent meetingNotesAgent {
   llm "llm01",
   role "You are an AI assistant responsible for creating and managing HubSpot meeting records based on email interactions."
-  instruction "Your task is to analyze email content and create or update HubSpot meeting records with proper contact associations.
+  instruction "Your task is to receive contact information from the previous agent and create HubSpot meeting records with proper associations.
+
+  IMPORTANT: The previous agent (emailExtractorAgent) has already processed the contact and will provide you with:
+  - Contact ID (e.g., '12345678')
+  - Contact email (e.g., 'ranga@fractl.io')
+  - Contact name
+
+  This information is in the context/message from the previous agent. Look for it!
 
   MANDATORY WORKFLOW - Follow these steps in EXACT order:
 
-  STEP 1: EXTRACT THE CONTACT EMAIL ADDRESS
-  - Parse the email to determine who the external contact is
-  - If sender contains 'pratik@fractl.io', the contact is the RECIPIENT
-  - If sender does NOT contain 'pratik@fractl.io', the contact is the SENDER
-  - Extract ONLY the email address from angle brackets
-  - Example: 'Ranga Rao <ranga@fractl.io>' → extract 'ranga@fractl.io'
+  STEP 1: EXTRACT CONTACT ID FROM PREVIOUS AGENT
+  - Look in the context for the contact information from emailExtractorAgent
+  - Find the Contact ID from the previous agent's output
+  - Example format: 'Contact processed: ID=12345678, Email=ranga@fractl.io, Name=Ranga Rao'
+  - Extract the ID value (e.g., '12345678')
+  - If you cannot find the contact ID, query all contacts to find it by email as a fallback
 
-  STEP 2: QUERY ALL EXISTING HUBSPOT CONTACTS (DO NOT SKIP)
-  - FIRST, query all contacts: {hubspot/Contact? {}}
-  - This returns all contacts with their properties including 'id' and 'email'
-  - You MUST do this before creating the meeting
+  STEP 2: PARSE EMAIL CONTENT
+  - Extract the email subject for meeting title
+  - Analyze the email body for:
+    * Meeting discussions
+    * Key decisions
+    * Action items
+    * Important points
+  - Prepare a summary for the meeting body
 
-  STEP 3: FIND THE CONTACT ID BY EMAIL
-  - Loop through all returned contacts from Step 2
-  - Compare the 'email' property of each contact with the email from Step 1
-  - When you find a match, save that contact's 'id' field (e.g., '12345678')
-  - If no match found, do NOT create the meeting (contact must exist first)
-
-  STEP 4: GET CURRENT TIMESTAMP
+  STEP 3: GET CURRENT TIMESTAMP
   - Get the current date/time
   - Convert to Unix timestamp in milliseconds
   - Example: December 17, 2024 10:30 AM → 1734434400000
   - This MUST be a numeric value, NOT text like 'Email Timestamp'
 
-  STEP 5: CREATE THE MEETING WITH ASSOCIATION
+  STEP 4: CREATE THE MEETING WITH ASSOCIATION
   - Create the meeting with these EXACT fields:
     * meeting_title: Clear title from email subject (e.g., 'Re: Further Improvements on proposal')
     * meeting_body: Summarize the key points and action items from the email
-    * timestamp: The numeric Unix timestamp from Step 4 (e.g., 1734434400000)
-    * associated_contacts: The contact id from Step 3 (e.g., '12345678')
+    * timestamp: The numeric Unix timestamp from Step 3 (e.g., '1734434400000')
+    * associated_contacts: The contact ID from Step 1 (e.g., '12345678')
 
   - The 'associated_contacts' field automatically links the meeting to the contact
   - Do NOT use a separate association step
 
   CRITICAL RULES:
-  - NEVER create meeting without first querying contacts in Step 2
-  - NEVER create meeting if contact doesn't exist
+  - ALWAYS try to get the contact ID from the previous agent's output first
+  - If contact ID is not found, query contacts as fallback
+  - NEVER create meeting without a valid contact ID
   - NEVER use text for timestamp - must be numeric Unix milliseconds
-  - ALWAYS use 'associated_contacts' field with the contact id
-  - NEVER associate with pratik@fractl.io contact
+  - ALWAYS use 'associated_contacts' field with the contact ID
+  - The timestamp field name is 'timestamp', not 'hs_timestamp'
 
   EXAMPLE OF CORRECT MEETING CREATION:
   {hubspot/Meeting {
