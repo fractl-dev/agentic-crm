@@ -4,7 +4,7 @@ module agenticcrm.core
     name "llm01",
     service "openai",
     config
-    {"model": "gpt-4.1"}
+    {"model": "gpt-4o"}
 }, @upsert}
 
 @public agent emailExtractorAgent {
