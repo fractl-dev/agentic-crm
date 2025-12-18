@@ -40,72 +40,87 @@ workflow findContact {
 
   MANDATORY WORKFLOW - Follow these steps in EXACT order:
 
-  STEP 1: EXTRACT THE CONTACT EMAIL ADDRESS
+  STEP 1: EXTRACT CONTACT EMAIL AND NAME
   - Parse the email to determine who the external contact is
   - If sender contains 'pratik@fractl.io', the contact is the RECIPIENT
   - If sender does NOT contain 'pratik@fractl.io', the contact is the SENDER
-  - Extract ONLY the email address from angle brackets
+  - Extract the email address from angle brackets
   - Example: 'Ranga Rao <ranga@fractl.io>' → extract 'ranga@fractl.io'
+  - Parse the name: 'Ranga Rao <ranga@fractl.io>' → 'Ranga Rao'
+  - Split into first_name and last_name
+  - first_name: 'Ranga', last_name: 'Rao'
 
-  STEP 2: QUERY ALL EXISTING HUBSPOT CONTACTS (DO NOT SKIP)
-  - FIRST, query all contacts: {hubspot/Contact? {}}
-  - This returns an array of contacts. Each contact has this EXACT structure:
+  STEP 2: USE findContact TOOL TO SEARCH FOR EXISTING CONTACT (PRIMARY METHOD)
+  - FIRST, use the findContact tool with the extracted information:
+    {agenticcrm.core/findContact {
+      email \"ranga@fractl.io\",
+      first_name \"Ranga\",
+      last_name \"Rao\"
+    }}
+  - This tool searches for the contact by email, first_name, and last_name
+  - If successful, it returns the contact with this structure:
     {
-      \"id\": \"contact_id_here\",
+      \"id\": \"350155650790\",
       \"properties\": {
         \"email\": \"ranga@fractl.io\",
         \"firstname\": \"Ranga\",
         \"lastname\": \"Rao\",
         \"hs_object_id\": \"350155650790\"
-      },
-      \"createdAt\": \"...\",
-      \"updatedAt\": \"...\",
-      \"archived\": false
+      }
     }
-  - IMPORTANT: The email is at properties.email, NOT at the top level
-  - You MUST do this before creating any contact
+  - If found, save the contact.id and proceed to Step 4
 
-  STEP 3: SEARCH FOR EXISTING CONTACT BY EMAIL
-  - Loop through all returned contacts from Step 2
-  - For each contact, access the email at: contact.properties.email (NOT contact.email)
-  - Compare contact.properties.email with the email from Step 1
+  STEP 3: FALLBACK - QUERY ALL CONTACTS (ONLY IF STEP 2 FAILS/ERRORS)
+  - If the findContact tool errors or returns no results, use this fallback:
+  - Query all contacts: {hubspot/Contact? {}}
+  - This returns an array of contacts with the structure shown in Step 2
+  - Loop through contacts and compare contact.properties.email with the target email
+  - For each contact, access: contact.properties.email (NOT contact.email)
   - If you find a match, save that contact's 'id' field (the top-level id)
   - Example: if contact.properties.email == 'ranga@fractl.io', then save contact.id
 
-  STEP 4: EXTRACT CONTACT NAME AND DETAILS
-  - Parse name from email header: 'Ranga Rao <ranga@fractl.io>' → 'Ranga Rao'
-  - Split into first_name and last_name
-  - first_name: 'Ranga', last_name: 'Rao'
+  STEP 4: DETERMINE IF CONTACT EXISTS
+  - If contact found in Step 2 OR Step 3, you have an existing contact
+  - If no contact found, you need to create a new one
 
   STEP 5: CREATE OR UPDATE CONTACT
-  - If match found in Step 3:
-    * UPDATE the existing contact using the saved contact id
+  - If contact found in Step 2 or Step 3:
+    * UPDATE the existing contact using the saved contact id (only if new information exists)
     * Get the updated contact information
-  - If NO match found in Step 3:
+  - If NO contact found in Step 2 or Step 3:
     * CREATE new contact with these fields:
       - email: 'ranga@fractl.io' (the extracted email)
       - first_name: 'Ranga'
       - last_name: 'Rao'
     * Get the newly created contact information
 
-  STEP 6: RETURN CONTACT INFORMATION (CRITICAL!)
-  - After creating/updating, you get back a contact object with the structure shown in Step 2
-  - Extract the contact.id from the returned contact
+  STEP 6: RETURN CONTACT INFORMATION (ABSOLUTELY MANDATORY!)
+  - After creating/updating/finding, you MUST have a contact object with this structure:
+    {
+      \"id\": \"350155650790\",
+      \"properties\": {
+        \"email\": \"ranga@fractl.io\",
+        \"firstname\": \"Ranga\",
+        \"lastname\": \"Rao\"
+      }
+    }
+  - Extract the contact.id from the contact object
   - You MUST provide the contact information to the next agent in your response
   - Return this information in this EXACT format:
     'Contact processed: ID=<contact.id>, Email=<contact.properties.email>, Name=<contact.properties.firstname> <contact.properties.lastname>'
   - Example: 'Contact processed: ID=350155650790, Email=ranga@fractl.io, Name=Ranga Rao'
-  - This information will be passed to the meeting notes agent
+  - This information MUST be in your response - the next agent (meetingNotesAgent) depends on it
 
   CRITICAL RULES:
-  - NEVER create contact without first querying all contacts in Step 2
+  - ALWAYS use findContact tool FIRST (Step 2) before falling back to query all contacts (Step 3)
+  - You MUST find or create a contact - never return without contact information
   - NEVER create duplicate contacts for the same email
   - NEVER create contact for pratik@fractl.io
   - ALWAYS extract email from angle brackets <email>
   - ALWAYS provide email, first_name, and last_name when creating
   - ALWAYS access properties using: contact.properties.email, contact.properties.firstname, contact.properties.lastname
   - ALWAYS use the top-level contact.id for the ID
-  - ALWAYS return the contact information at the end",
+  - MANDATORY: Your response MUST include the contact information in the exact format shown above",
   retry agenticcrm.core/classifyRetry,
   tools [hubspot/Contact, agenticcrm.core/findContact]
 }
@@ -115,18 +130,17 @@ workflow findContact {
   role "You are an AI assistant responsible for creating and managing HubSpot meeting records based on email interactions."
   instruction "Your task is to receive contact information from the previous agent and create HubSpot meeting records with proper associations.
 
-  IMPORTANT: The context for you will have the contact information like this:
-  - Contact ID (e.g., '12345678')
-  - Contact email (e.g., 'ranga@fractl.io')
-  - Contact name
+  CRITICAL: The emailExtractorAgent has ALREADY found/created the contact and MUST provide the contact ID.
+  You should ONLY use the contact information from the previous agent's context.
 
-  MANDATORY WORKFLOW - Follow these steps properly in EXACT order:
+  MANDATORY WORKFLOW - Follow these steps in EXACT order:
 
-  STEP 1: EXTRACT CONTACT ID FROM PREVIOUS AGENT
-  - Look in the context for the contact information
-  - Find the Contact ID
-  - Example format: 'Contact processed: ID=350155650790, Email=ranga@fractl.io, Name=Ranga Rao'
+  STEP 1: EXTRACT CONTACT ID FROM PREVIOUS AGENT (REQUIRED)
+  - The previous agent (emailExtractorAgent) MUST have provided contact information
+  - Look in the context for this EXACT format:
+    'Contact processed: ID=350155650790, Email=ranga@fractl.io, Name=Ranga Rao'
   - Extract the ID value (e.g., '350155650790')
+  - This contact ID is REQUIRED - if not found, report error and do NOT proceed
 
   STEP 2: PARSE EMAIL CONTENT
   - Extract the email subject for meeting title
@@ -154,13 +168,13 @@ workflow findContact {
   - Do NOT use a separate association step
 
   CRITICAL RULES:
-  - ALWAYS try to get the contact ID from the previous agent's output first
-  - If contact ID is not found, query contacts as fallback using contact.properties.email
-  - NEVER create meeting without a valid contact ID
+  - You MUST get the contact ID from the previous agent's output - NO fallbacks
+  - If contact ID is not in the context, report error - do NOT try to find it yourself
+  - NEVER create meeting without a valid contact ID from the previous agent
   - NEVER use text for timestamp - must be numeric Unix milliseconds
   - ALWAYS use 'associated_contacts' field with the contact ID
   - The timestamp field name is 'timestamp', not 'hs_timestamp'
-  - When querying contacts, remember: email is at contact.properties.email, NOT contact.email
+  - Trust that emailExtractorAgent has already handled all contact lookup logic
 
   EXAMPLE OF CORRECT MEETING CREATION:
   {hubspot/Meeting {
