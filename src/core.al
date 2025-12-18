@@ -42,29 +42,46 @@ record MeetingInfo {
   role "You extract email addresses and names from email messages."
   instruction "Your ONLY task is to parse the email message and extract contact information.
 
+  MESSAGE FORMAT:
+  The message will look like this:
+  'Email sender is: Pratik Karki <pratik@fractl.io>, email recipient is: Ranga Rao <ranga@fractl.io>, email subject is: ...'
+
   STEP 1: IDENTIFY WHO IS THE EXTERNAL CONTACT
+  - Look for 'Email sender is:' to find the sender
+  - Look for 'email recipient is:' to find the recipient
   - If the sender contains 'pratik@fractl.io', the external contact is the RECIPIENT
   - If the sender does NOT contain 'pratik@fractl.io', the external contact is the SENDER
   - Never extract pratik@fractl.io as the contact
 
-  STEP 2: EXTRACT EMAIL ADDRESS
-  - Extract ONLY the email address from angle brackets
+  STEP 2: EXTRACT EMAIL ADDRESS FROM THE EXTERNAL CONTACT
+  - From the external contact field (sender or recipient), extract ONLY the email inside angle brackets <>
   - Example: 'Ranga Rao <ranga@fractl.io>' → extract 'ranga@fractl.io'
+  - Example: 'John Doe <john@example.com>' → extract 'john@example.com'
 
-  STEP 3: EXTRACT NAME
-  - Parse the name from the email header
-  - Example: 'Ranga Rao <ranga@fractl.io>' → 'Ranga Rao'
-  - Split into first_name and last_name
-  - Example: first_name='Ranga', last_name='Rao'
+  STEP 3: EXTRACT NAME FROM THE EXTERNAL CONTACT
+  - From the external contact field, extract the name BEFORE the angle brackets
+  - Example: 'Ranga Rao <ranga@fractl.io>' → extract 'Ranga Rao'
+  - Split the name into firstName and lastName
+  - Example: 'Ranga Rao' → firstName='Ranga', lastName='Rao'
+  - Example: 'John Doe' → firstName='John', lastName='Doe'
 
   STEP 4: RETURN THE EXTRACTED INFORMATION
-  - Return contactEmail (the email address)
-  - Return firstName (first name only)
-  - Return lastName (last name only)
+  - Return contactEmail (the email address from step 2)
+  - Return firstName (first name from step 3)
+  - Return lastName (last name from step 3)
+
+  EXAMPLE:
+  Input: 'Email sender is: Pratik Karki <pratik@fractl.io>, email recipient is: Ranga Rao <ranga@fractl.io>...'
+  - Sender contains pratik@fractl.io → External contact is RECIPIENT
+  - Extract from recipient: 'Ranga Rao <ranga@fractl.io>'
+  - contactEmail = 'ranga@fractl.io'
+  - firstName = 'Ranga'
+  - lastName = 'Rao'
 
   CRITICAL RULES:
   - Extract ONLY - do NOT query or create anything
-  - NEVER extract pratik@fractl.io as a contact",
+  - NEVER extract pratik@fractl.io as a contact
+  - Always extract from the correct field (sender OR recipient, not both)",
   responseSchema agenticcrm.core/ContactInfo,
   retry agenticcrm.core/classifyRetry
 }
