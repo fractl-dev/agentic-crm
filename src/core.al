@@ -240,7 +240,6 @@ decision contactExistsCheck {
   tools [hubspot/Meeting]
 }
 
-// FLOWS: Connect agents with decision-based routing
 flow contactFlow {
   parseEmailInfo --> findExistingContact
   findExistingContact --> contactExistsCheck
@@ -256,12 +255,18 @@ flow crmManager {
   contactFlow --> meetingFlow
 }
 
-// Orchestrator agent
+@public agent contactFlow {
+  role "You manage the contact identification and creation workflow."
+}
+
+@public agent meetingFlow {
+  role "You manage the meeting creation and association workflow."
+}
+
 @public agent crmManager {
   role "You coordinate the contact and meeting creation workflow using deterministic decision-based routing."
 }
 
-// Workflow: Trigger on email arrival
 workflow @after create:gmail/Email {
     this.body @as emailBody
     this.sender @as emailSender
