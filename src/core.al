@@ -4,8 +4,18 @@ module agenticcrm.core
     name "llm01",
     service "openai",
     config
-    {"model": "gpt-5.1"}
+    {"model": "gpt-5.2"}
 }, @upsert}
+
+agentlang/retry classifyRetry {
+  attempts 3,
+  backoff {
+    strategy linear,
+    delay 2,
+    magnitude seconds,
+    factor 2
+  }
+}
 
 @public agent emailExtractorAgent {
   llm "llm01",
