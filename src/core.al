@@ -25,16 +25,16 @@ module agenticcrm.core
   - FIRST, query all contacts: {hubspot/Contact? {}}
   - This returns an array of contacts. Each contact has this EXACT structure:
     {
-      "id": "contact_id_here",
-      "properties": {
-        "email": "ranga@fractl.io",
-        "firstname": "Ranga",
-        "lastname": "Rao",
-        "hs_object_id": "350155650790"
+      \"id\": \"contact_id_here\",
+      \"properties\": {
+        \"email\": \"ranga@fractl.io\",
+        \"firstname\": \"Ranga\",
+        \"lastname\": \"Rao\",
+        \"hs_object_id\": \"350155650790\"
       },
-      "createdAt": "...",
-      "updatedAt": "...",
-      "archived": false
+      \"createdAt\": \"...\",
+      \"updatedAt\": \"...\",
+      \"archived\": false
     }
   - IMPORTANT: The email is at properties.email, NOT at the top level
   - You MUST do this before creating any contact
@@ -107,11 +107,11 @@ module agenticcrm.core
   - Query all contacts: {hubspot/Contact? {}}
   - This returns contacts with structure:
     {
-      "id": "contact_id",
-      "properties": {
-        "email": "ranga@fractl.io",
-        "firstname": "Ranga",
-        "lastname": "Rao"
+      \"id\": \"contact_id\",
+      \"properties\": {
+        \"email\": \"ranga@fractl.io\",
+        \"firstname\": \"Ranga\",
+        \"lastname\": \"Rao\"
       }
     }
   - Loop through contacts and compare contact.properties.email with the target email
