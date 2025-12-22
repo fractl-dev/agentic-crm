@@ -69,6 +69,7 @@ record MeetingInfo {
   - Return contactEmail (the email address from step 2)
   - Return firstName (first name from step 3)
   - Return lastName (last name from step 3)
+  - Save these info to ContactInfo record as responseSchema
 
   EXAMPLE:
   Input: 'Email sender is: Pratik Karki <pratik@fractl.io>, email recipient is: Ranga Rao <ranga@fractl.io>...'
@@ -88,33 +89,31 @@ record MeetingInfo {
 
 @public agent findExistingContact {
   llm "llm01",
-  role "You search for existing HubSpot contacts by querying all contacts and looping through them."
-  instruction "Your task is to search for a contact with email {{contactEmail}} in HubSpot.
+  role "You query all HubSpot contacts and search for a specific email address."
+  instruction "Query all HubSpot contacts and find if any contact has email {{contactEmail}}.
 
-  STEP 1: USE THE HUBSPOT TOOL TO QUERY ALL CONTACTS
-  - Call the hubspot/Contact tool with a query operation
-  - Query all contacts to get the full list
-  - You will receive a list of contact objects
+WHAT YOU MUST DO:
+1. Call the hubspot/Contact tool to query ALL existing contacts
+2. Examine EVERY contact in the results
+3. For each contact, check if contact.properties.email matches {{contactEmail}}
+4. If you find a match, return contactFound=true and existingContactId=the contact's id
+5. If no match after checking all contacts, return contactFound=false
 
-  STEP 2: EXAMINE EACH CONTACT IN THE RESULTS
-  - Loop through each contact returned from the query
-  - For each contact, look at the properties.email field
-  - Check if properties.email matches {{contactEmail}}
-  - Remember: email is at contact.properties.email (not contact.email)
+DATA STRUCTURE:
+- Contacts have: id (string, top level) and properties (object with email, firstname, lastname)
+- Email is at: contact.properties.email
+- ID is at: contact.id
 
-  STEP 3: IF YOU FIND A MATCHING CONTACT
-  - Extract the id field from that contact (it's at the top level)
-  - Return contactFound: true
-  - Return existingContactId: the id value (example: \"350155650790\")
+EXAMPLE:
+- If you query and get a contact with id=\"123456\" and properties.email=\"ranga@fractl.io\"
+- And {{contactEmail}} is \"ranga@fractl.io\"
+- Then return: contactFound=true, existingContactId=\"123456\"
 
-  STEP 4: IF NO CONTACT MATCHES
-  - Return contactFound: false
-
-  IMPORTANT:
-  - You have access to the hubspot/Contact tool - USE IT to query contacts
-  - Return actual ID values from the query results
-  - Do not return code, syntax, or placeholder text
-  - The existingContactId must be a real ID like \"350155650790\"",
+REQUIREMENTS:
+- MUST query the hubspot/Contact tool
+- MUST check ALL contacts returned
+- Compare emails case-insensitively
+- Return actual ID values from the query results",
   responseSchema agenticcrm.core/ContactSearchResult,
   retry agenticcrm.core/classifyRetry,
   tools [hubspot/Contact]
