@@ -46,28 +46,14 @@ event FindContactByEmail {
 workflow FindContactByEmail {
     FindContactByEmail.email @as targetEmail;
 
-    {hubspot/Contact? {}} @as allContacts;
+    {hubspot/Contact? {email? targetEmail}} @as foundContacts;
 
-    let foundId = null;
-
-    for (c in allContacts) {
-        let contactEmail = c.email;
-
-        if (contactEmail == null) {
-            let contactEmail = c.properties.email
-        }
-
-        if (contactEmail <> null && contactEmail == targetEmail) {
-            let foundId = c.id;
-            break
-        }
-    }
-
-    if (foundId <> null) {
+    if (foundContacts <> []) {
+        foundContacts @as [firstContact];
         {FindContactByEmail {
             email: targetEmail,
             contactFound: true,
-            existingContactId: foundId
+            existingContactId: firstContact.id
         }}
     } else {
         {FindContactByEmail {
