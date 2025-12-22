@@ -37,6 +37,46 @@ record MeetingInfo {
     meetingBody String
 }
 
+event FindContactByEmail {
+    email String,
+    contactFound Boolean @optional,
+    existingContactId String @optional
+}
+
+workflow FindContactByEmail {
+    FindContactByEmail.email @as targetEmail;
+
+    {hubspot/Contact? {}} @as allContacts;
+
+    let foundId = null;
+
+    for (c in allContacts) {
+        let contactEmail = c.email;
+
+        if (contactEmail == null) {
+            let contactEmail = c.properties.email
+        }
+
+        if (contactEmail <> null && contactEmail == targetEmail) {
+            let foundId = c.id;
+            break
+        }
+    }
+
+    if (foundId <> null) {
+        {FindContactByEmail {
+            email: targetEmail,
+            contactFound: true,
+            existingContactId: foundId
+        }}
+    } else {
+        {FindContactByEmail {
+            email: targetEmail,
+            contactFound: false
+        }}
+    }
+}
+
 @public agent parseEmailInfo {
   llm "llm01",
   role "You extract email addresses and names from email messages."
@@ -89,46 +129,34 @@ record MeetingInfo {
 
 @public agent findExistingContact {
   llm "llm01",
-  role "You search for a HubSpot contact by querying all contacts and checking each one's email."
+  role "You search for a HubSpot contact by email address."
   instruction "Search for a contact with email address {{contactEmail}} in HubSpot.
 
 TARGET EMAIL: {{contactEmail}}
-You are looking for this specific email address in the HubSpot contacts.
 
-STEP 1: CALL THE HUBSPOT TOOL TO GET ALL CONTACTS
-- Call hubspot/Contact tool to query all contacts
-- Do not pass any filter parameters
-- This returns a list/array of contact objects
+STEP 1: CREATE FindContactByEmail ENTITY
+- Create an agenticcrm.core/FindContactByEmail entity with email={{contactEmail}}
+- This will trigger a workflow that searches all HubSpot contacts
+- The workflow will update the entity with the search results
 
-STEP 2: EXAMINE EVERY SINGLE CONTACT IN THE RESULTS
-For EACH contact object in the list, you must check these possible email locations:
-- contact.email (top-level email field)
-- contact.properties.email (email in properties map)
-- contact.properties['email'] (email as map key)
+STEP 2: READ THE RESULT FROM THE CREATED ENTITY
+After creating the entity, read it back to get:
+- contactFound: true/false (whether contact exists)
+- existingContactId: the contact ID (if found)
 
-Compare the email you find with {{contactEmail}} using case-INSENSITIVE matching.
-For example: ranga@fractl.io = Ranga@Fractl.io = RANGA@FRACTL.IO
+STEP 3: RETURN THE RESULT
 
-STEP 3: WHEN YOU FIND A MATCH
-If ANY contact has an email matching {{contactEmail}}:
-1. Get that contact's ID from contact.id
-2. Stop searching
-3. Return: {\"contactFound\": true, \"existingContactId\": \"the ID you found\"}
+Return in this format:
+- If contactFound=true: {\"contactFound\": true, \"existingContactId\": \"the ID\"}
+- If contactFound=false: {\"contactFound\": false}
 
-STEP 4: IF NO MATCH AFTER CHECKING ALL CONTACTS
-If you checked every contact and none have email matching {{contactEmail}}:
-- Return: {\"contactFound\": false}
-
-DEBUGGING HELP:
-- If you query and get 10 contacts, you MUST check all 10
-- If one has email={{contactEmail}}, return contactFound=true
-- The contact with email ranga@fractl.io HAS ID 350155650790
-- If you see this contact, you MUST return contactFound=true with this ID
-
-DO NOT SKIP THE QUERY. DO NOT SKIP THE LOOP. CHECK EVERY CONTACT.",
+CRITICAL:
+- CREATE agenticcrm.core/FindContactByEmail with email={{contactEmail}}
+- After creation, the entity will have contactFound and existingContactId fields populated
+- Return those values",
   responseSchema agenticcrm.core/ContactSearchResult,
   retry agenticcrm.core/classifyRetry,
-  tools [hubspot/Contact]
+  tools [agenticcrm.core/FindContactByEmail]
 }
 
 decision contactExistsCheck {
@@ -254,38 +282,38 @@ CRITICAL:
 @public agent createMeeting {
   llm "llm01",
   role "You create HubSpot meetings and associate them with contacts."
-  instruction "Your ONLY task is to create a meeting and link it to the contact.
+  instruction "Create a meeting in HubSpot with the information provided.
 
-  MEETING INFORMATION:
-  - Contact ID: {{finalContactId}}
-  - Meeting Title: {{meetingTitle}}
-  - Meeting Body: {{meetingBody}}
+YOU HAVE THESE VALUES AVAILABLE:
+- Contact ID: {{finalContactId}} (this is the actual contact ID to associate)
+- Meeting Title: {{meetingTitle}} (this is the actual title from the email)
+- Meeting Body: {{meetingBody}} (this is the actual summary of the email)
 
-  STEP 1: GENERATE TIMESTAMP
-  - Get the current date/time
-  - Convert to Unix timestamp in milliseconds
-  - Example: 1734434400000
-  - MUST be a numeric value, NOT text
+STEP 1: GENERATE CURRENT TIMESTAMP
+- Get current date/time
+- Convert to Unix milliseconds (numeric, like 1734434400000)
 
-  STEP 2: CREATE THE MEETING
-  - Create meeting with these fields:
-    * meeting_title: use {{meetingTitle}}
-    * meeting_body: use {{meetingBody}}
-    * timestamp: the numeric Unix timestamp
-    * associated_contacts: use {{finalContactId}}
-  - Example:
-    {hubspot/Meeting {
-      meeting_title 'Re: Further Improvements on proposal',
-      meeting_body 'Discussion about onboarding team members...',
-      timestamp '1734434400000',
-      associated_contacts '350155650790'
-    }}
+STEP 2: CREATE THE MEETING
+Use the hubspot/Meeting tool with:
+- meeting_title: the ACTUAL title value (NOT the word 'meetingTitle')
+- meeting_body: the ACTUAL summary text (NOT the word 'meetingBody')
+- timestamp: the numeric timestamp you generated
+- associated_contacts: the ACTUAL contact ID (NOT the word 'finalContactId')
 
-  CRITICAL RULES:
-  - Create ONLY - do NOT search for contacts
-  - Use numeric timestamp in milliseconds
-  - Use 'timestamp' field name (NOT 'hs_timestamp')
-  - Use 'associated_contacts' field with contact ID",
+EXAMPLE OF WHAT TO CREATE:
+If meetingTitle=\"Fifth meeting notes\" and meetingBody=\"Discussion about onboarding\" and finalContactId=\"350155650790\":
+{hubspot/Meeting {
+  meeting_title \"Fifth meeting notes\",
+  meeting_body \"Discussion about onboarding team members and customers to the platform.\",
+  timestamp \"1734434400000\",
+  associated_contacts \"350155650790\"
+}}
+
+CRITICAL:
+- Use the ACTUAL VALUES from the scratchpad, not the placeholder names
+- Do NOT write {{meetingTitle}} - write the actual title
+- Do NOT write {{meetingBody}} - write the actual body text
+- Do NOT write {{finalContactId}} - write the actual ID",
   retry agenticcrm.core/classifyRetry,
   tools [hubspot/Meeting]
 }
