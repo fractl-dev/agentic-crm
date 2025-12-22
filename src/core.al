@@ -89,39 +89,43 @@ record MeetingInfo {
 
 @public agent findExistingContact {
   llm "llm01",
-  role "You search for a HubSpot contact by email address."
-  instruction "Find if a contact with email {{contactEmail}} exists in HubSpot.
+  role "You search for a HubSpot contact by querying all contacts and checking each one's email."
+  instruction "Search for a contact with email address {{contactEmail}} in HubSpot.
 
-STEP 1: Query all contacts
-- Use the hubspot/Contact tool
-- Query with no parameters to get all contacts
-- You will get back a list of contact objects
+TARGET EMAIL: {{contactEmail}}
+You are looking for this specific email address in the HubSpot contacts.
 
-STEP 2: Search through the results
-- Loop through each contact
-- Check if contact.email matches {{contactEmail}} (ignore case)
-- Also check contact.properties.email if contact.email doesn't exist
+STEP 1: CALL THE HUBSPOT TOOL TO GET ALL CONTACTS
+- Call hubspot/Contact tool to query all contacts
+- Do not pass any filter parameters
+- This returns a list/array of contact objects
 
-STEP 3: Return the result in THIS EXACT FORMAT
+STEP 2: EXAMINE EVERY SINGLE CONTACT IN THE RESULTS
+For EACH contact object in the list, you must check these possible email locations:
+- contact.email (top-level email field)
+- contact.properties.email (email in properties map)
+- contact.properties['email'] (email as map key)
 
-If you found a matching contact:
-{
-  \"contactFound\": true,
-  \"existingContactId\": \"the actual contact ID like 350155650790\"
-}
+Compare the email you find with {{contactEmail}} using case-INSENSITIVE matching.
+For example: ranga@fractl.io = Ranga@Fractl.io = RANGA@FRACTL.IO
 
-If you did NOT find a matching contact:
-{
-  \"contactFound\": false
-}
+STEP 3: WHEN YOU FIND A MATCH
+If ANY contact has an email matching {{contactEmail}}:
+1. Get that contact's ID from contact.id
+2. Stop searching
+3. Return: {\"contactFound\": true, \"existingContactId\": \"the ID you found\"}
 
-CRITICAL:
-- You MUST return JSON in the format above
-- Do NOT return an empty array []
-- Do NOT return the contacts list
-- contactFound must be a boolean (true or false)
-- existingContactId must be the actual ID string from the contact you found
-- If contact with {{contactEmail}} exists, you MUST return contactFound: true",
+STEP 4: IF NO MATCH AFTER CHECKING ALL CONTACTS
+If you checked every contact and none have email matching {{contactEmail}}:
+- Return: {\"contactFound\": false}
+
+DEBUGGING HELP:
+- If you query and get 10 contacts, you MUST check all 10
+- If one has email={{contactEmail}}, return contactFound=true
+- The contact with email ranga@fractl.io HAS ID 350155650790
+- If you see this contact, you MUST return contactFound=true with this ID
+
+DO NOT SKIP THE QUERY. DO NOT SKIP THE LOOP. CHECK EVERY CONTACT.",
   responseSchema agenticcrm.core/ContactSearchResult,
   retry agenticcrm.core/classifyRetry,
   tools [hubspot/Contact]
