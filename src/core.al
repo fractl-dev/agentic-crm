@@ -89,35 +89,39 @@ record MeetingInfo {
 
 @public agent findExistingContact {
   llm "llm01",
-  role "You query all HubSpot contacts and search for a specific email address."
-  instruction "Query all HubSpot contacts and find if any contact has email {{contactEmail}}.
+  role "You search for a HubSpot contact by email address."
+  instruction "Find if a contact with email {{contactEmail}} exists in HubSpot.
 
-HOW TO QUERY CONTACTS:
-- Use the hubspot/Contact tool to query with NO parameters (empty query)
-- This will return ALL contacts
-- Do NOT pass any filter parameters like url, email, or other fields
-- Just query everything and then search through the results
+STEP 1: Query all contacts
+- Use the hubspot/Contact tool
+- Query with no parameters to get all contacts
+- You will get back a list of contact objects
 
-WHAT TO DO:
-1. Query ALL contacts using hubspot/Contact tool (no filters)
-2. Loop through each contact in the results
-3. For each contact, check: contact.email == {{contactEmail}} (case-insensitive)
-4. If match found: return contactFound=true, existingContactId=contact.id
-5. If no match found: return contactFound=false
+STEP 2: Search through the results
+- Loop through each contact
+- Check if contact.email matches {{contactEmail}} (ignore case)
+- Also check contact.properties.email if contact.email doesn't exist
 
-VALID CONTACT FIELDS:
-- id (string)
-- email (string)
-- first_name (string)
-- last_name (string)
-- properties (object)
+STEP 3: Return the result in THIS EXACT FORMAT
 
-IMPORTANT:
-- Do NOT use 'url' field (it doesn't exist)
-- Do NOT pass query parameters
-- Just query all and loop through results
-- Access email at: contact.email OR contact.properties.email (try both)
-- Access ID at: contact.id",
+If you found a matching contact:
+{
+  \"contactFound\": true,
+  \"existingContactId\": \"the actual contact ID like 350155650790\"
+}
+
+If you did NOT find a matching contact:
+{
+  \"contactFound\": false
+}
+
+CRITICAL:
+- You MUST return JSON in the format above
+- Do NOT return an empty array []
+- Do NOT return the contacts list
+- contactFound must be a boolean (true or false)
+- existingContactId must be the actual ID string from the contact you found
+- If contact with {{contactEmail}} exists, you MUST return contactFound: true",
   responseSchema agenticcrm.core/ContactSearchResult,
   retry agenticcrm.core/classifyRetry,
   tools [hubspot/Contact]
@@ -137,21 +141,25 @@ decision contactExistsCheck {
   role "You update existing HubSpot contacts and return the contact ID."
   instruction "Update the existing contact if needed, then return its ID.
 
-  CONTACT INFORMATION:
-  - Existing Contact ID: {{existingContactId}}
-  - First Name: {{firstName}}
-  - Last Name: {{lastName}}
+CONTACT INFORMATION:
+- Existing Contact ID: {{existingContactId}}
+- First Name: {{firstName}}
+- Last Name: {{lastName}}
 
-  WHAT TO DO:
-  - You can optionally update the contact with new information using the hubspot/Contact tool
-  - If updating, use ONLY these valid fields: first_name, last_name
-  - Do NOT use: url, website, or any other invalid fields
-  - Then return the contact ID
+STEP 1: Optionally update (if needed)
+- You can use the hubspot/Contact tool to update
+- If updating, use only: first_name, last_name
+- Do NOT use: url, website, or other invalid fields
 
-  RETURN VALUE:
-  - Set finalContactId to the value of {{existingContactId}}
-  - This must be the actual ID string (like \"350155650790\")
-  - Do not return code or syntax",
+STEP 2: Return in THIS EXACT FORMAT
+{
+  \"finalContactId\": \"{{existingContactId}}\"
+}
+
+CRITICAL:
+- You MUST return JSON with finalContactId
+- The value should be {{existingContactId}} (the ID passed to you)
+- This is the actual ID string like \"350155650790\"",
   responseSchema agenticcrm.core/ContactResult,
   retry agenticcrm.core/classifyRetry,
   tools [hubspot/Contact]
@@ -162,27 +170,29 @@ decision contactExistsCheck {
   role "You create new HubSpot contacts and return the contact ID."
   instruction "Create a new contact in HubSpot and return its ID.
 
-  CONTACT INFORMATION:
-  - Email: {{contactEmail}}
-  - First Name: {{firstName}}
-  - Last Name: {{lastName}}
+CONTACT TO CREATE:
+- Email: {{contactEmail}}
+- First Name: {{firstName}}
+- Last Name: {{lastName}}
 
-  WHAT TO DO:
-  - Use the hubspot/Contact tool to create a new contact
-  - Use ONLY these valid fields: email, first_name, last_name
-  - Extract the id from the created contact object
-  - Return that id as finalContactId
+STEP 1: Create the contact
+- Use the hubspot/Contact tool
+- Create with these fields only: email, first_name, last_name
+- Do NOT use: url, website, or other fields
 
-  VALID FIELDS FOR CREATION:
-  - email (required)
-  - first_name (optional)
-  - last_name (optional)
-  - Do NOT use: url, website, or any other fields
+STEP 2: Extract the ID
+- Get the id from the created contact
+- The id will be a string like \"350155650790\"
 
-  RETURN VALUE:
-  - Set finalContactId to the actual ID of the created contact
-  - This must be a real ID string (like \"350155650790\")
-  - Do not return code or syntax",
+STEP 3: Return in THIS EXACT FORMAT
+{
+  \"finalContactId\": \"the actual ID like 350155650790\"
+}
+
+CRITICAL:
+- You MUST return JSON with finalContactId
+- The value must be the actual ID from the created contact
+- Do NOT return code or syntax",
   responseSchema agenticcrm.core/ContactResult,
   retry agenticcrm.core/classifyRetry,
   tools [hubspot/Contact]
