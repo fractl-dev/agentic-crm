@@ -66,6 +66,8 @@ workflow FindContactByEmail {
   role "You extract email addresses and names from email messages."
   instruction "Your ONLY task is to parse the email message and extract contact information.
 
+  Properly follow the instructions provided. Don't try to be creative, only use the provided information.
+
   MESSAGE FORMAT:
   The message will look like this:
   'Email sender is: Pratik Karki <pratik@fractl.io>, email recipient is: John Doe <john@doe.io>, email subject is: ...'
