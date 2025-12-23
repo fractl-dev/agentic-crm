@@ -20,8 +20,7 @@ agentlang/retry classifyRetry {
 record ContactInfo {
     contactEmail String,
     firstName String,
-    lastName String,
-    adminEmail String
+    lastName String
 }
 
 record ContactSearchResult {
@@ -90,16 +89,10 @@ workflow FindContactByEmail {
   - Example: 'Ranga Rao' → firstName='Ranga', lastName='Rao'
   - Example: 'John Doe' → firstName='John', lastName='Doe'
 
-  STEP 4: EXTRACT ADMIN EMAIL
-  - Extract the email from either sender or recipient that contains 'pratik@fractl.io'
-  - This is the admin user who will be the meeting owner
-  - Example: 'Pratik Karki <pratik@fractl.io>' → extract 'pratik@fractl.io'
-
-  STEP 5: RETURN THE EXTRACTED INFORMATION
+  STEP 4: RETURN THE EXTRACTED INFORMATION
   - Return contactEmail (the email address from step 2)
   - Return firstName (first name from step 3)
   - Return lastName (last name from step 3)
-  - Return adminEmail (the admin email from step 4)
   - Save these info to ContactInfo record as responseSchema
 
   EXAMPLE:
@@ -109,12 +102,10 @@ workflow FindContactByEmail {
   - contactEmail = 'ranga@fractl.io'
   - firstName = 'Ranga'
   - lastName = 'Rao'
-  - adminEmail = 'pratik@fractl.io'
 
   CRITICAL RULES:
   - Extract ONLY - do NOT query or create anything
   - NEVER extract pratik@fractl.io as a contact
-  - Always extract adminEmail for the meeting owner
   - Always extract from the correct field (sender OR recipient, not both)",
   responseSchema agenticcrm.core/ContactInfo,
   retry agenticcrm.core/classifyRetry
@@ -280,10 +271,13 @@ STEP 1: GENERATE CURRENT TIMESTAMP
 - Convert to Unix milliseconds (numeric, like 1734434400000)
 
 STEP 2: CREATE THE MEETING
-Use the hubspot/Meeting tool with:
+Use the hubspot/Meeting tool with these REQUIRED fields:
 - meeting_title: the ACTUAL title value (NOT the word 'meetingTitle')
 - meeting_body: the ACTUAL summary text (NOT the word 'meetingBody')
 - timestamp: the numeric timestamp you generated
+- meeting_outcome: \"COMPLETED\" (this is REQUIRED for meetings to show in HubSpot UI)
+- meeting_start_time: the same numeric timestamp you generated
+- meeting_end_time: the timestamp + 3600000 (1 hour later)
 - associated_contacts: the ACTUAL contact ID (NOT the word 'finalContactId')
 
 EXAMPLE OF WHAT TO CREATE:
@@ -292,6 +286,9 @@ If meetingTitle=\"Fifth meeting notes\" and meetingBody=\"Discussion about onboa
   meeting_title \"Fifth meeting notes\",
   meeting_body \"Discussion about onboarding team members and customers to the platform.\",
   timestamp \"1734434400000\",
+  meeting_outcome \"COMPLETED\",
+  meeting_start_time \"1734434400000\",
+  meeting_end_time \"1734438000000\",
   associated_contacts \"350155650790\"
 }}
 
@@ -299,8 +296,7 @@ CRITICAL:
 - Use the ACTUAL VALUES from the scratchpad, not the placeholder names
 - Do NOT write {{meetingTitle}} - write the actual title
 - Do NOT write {{meetingBody}} - write the actual body text
-- Do NOT write {{finalContactId}} - write the actual ID
-- If ownerId is null, do NOT include the owner field",
+- Do NOT write {{finalContactId}} - write the actual ID",
   retry agenticcrm.core/classifyRetry,
   tools [hubspot/Meeting]
 }
