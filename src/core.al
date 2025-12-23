@@ -4,7 +4,7 @@ module agenticcrm.core
     name "llm01",
     service "openai",
     config
-    {"model": "gpt-5.2"}
+    {"model": "gpt-4o"}
 }, @upsert}
 
 agentlang/retry classifyRetry {
