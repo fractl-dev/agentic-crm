@@ -283,14 +283,21 @@ If meetingTitle=\"Fifth meeting notes\" and meetingBody=\"Discussion about onboa
   meeting_title \"Fifth meeting notes\",
   meeting_body \"Discussion about onboarding team members and customers to the platform.\",
   timestamp \"1734434400000\",
-  associated_contacts \"350155650790\"
+  associated_contacts \"350155650790\",
+  meeting_outcome \"COMPLETED\",
+  meeting_start_time \"2021-03-23T01:02:44.872Z\",
+  meeting_end_time \"2021-03-23T01:52:44.872Z\"
 }}
 
 CRITICAL:
 - Use the ACTUAL VALUES from the scratchpad, not the placeholder names
 - Do NOT write {{meetingTitle}} - write the actual title
 - Do NOT write {{meetingBody}} - write the actual body text
-- Do NOT write {{finalContactId}} - write the actual ID",
+- Do NOT write {{finalContactId}} - write the actual ID
+- Use proper contact id, do not use the provided associated_contacts
+- Properly figure out timestamp, meeting start time and meeting end time
+- Additionally, generate proper meeting_title and meeting_body based on email
+- Also, properly see if the meeting outcome is one of these: COMPLETED, SCHEDULED, RESCHEDULED, CANCELED",
   retry agenticcrm.core/classifyRetry,
   tools [hubspot/Meeting]
 }
