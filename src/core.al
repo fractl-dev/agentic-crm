@@ -20,7 +20,8 @@ agentlang/retry classifyRetry {
 record ContactInfo {
     contactEmail String,
     firstName String,
-    lastName String
+    lastName String,
+    adminEmail String
 }
 
 record ContactSearchResult {
@@ -35,6 +36,10 @@ record ContactResult {
 record MeetingInfo {
     meetingTitle String,
     meetingBody String
+}
+
+record OwnerLookupResult {
+    ownerId String @optional
 }
 
 event FindContactByEmail {
@@ -89,10 +94,16 @@ workflow FindContactByEmail {
   - Example: 'Ranga Rao' → firstName='Ranga', lastName='Rao'
   - Example: 'John Doe' → firstName='John', lastName='Doe'
 
-  STEP 4: RETURN THE EXTRACTED INFORMATION
+  STEP 4: EXTRACT ADMIN EMAIL
+  - Extract the email from either sender or recipient that contains 'pratik@fractl.io'
+  - This is the admin user who will be the meeting owner
+  - Example: 'Pratik Karki <pratik@fractl.io>' → extract 'pratik@fractl.io'
+
+  STEP 5: RETURN THE EXTRACTED INFORMATION
   - Return contactEmail (the email address from step 2)
   - Return firstName (first name from step 3)
   - Return lastName (last name from step 3)
+  - Return adminEmail (the admin email from step 4)
   - Save these info to ContactInfo record as responseSchema
 
   EXAMPLE:
@@ -102,10 +113,12 @@ workflow FindContactByEmail {
   - contactEmail = 'ranga@fractl.io'
   - firstName = 'Ranga'
   - lastName = 'Rao'
+  - adminEmail = 'pratik@fractl.io'
 
   CRITICAL RULES:
   - Extract ONLY - do NOT query or create anything
   - NEVER extract pratik@fractl.io as a contact
+  - Always extract adminEmail for the meeting owner
   - Always extract from the correct field (sender OR recipient, not both)",
   responseSchema agenticcrm.core/ContactInfo,
   retry agenticcrm.core/classifyRetry
@@ -256,6 +269,39 @@ CRITICAL:
   retry agenticcrm.core/classifyRetry
 }
 
+@public agent findMeetingOwner {
+  llm "llm01",
+  role "You look up HubSpot owner by email address."
+  instruction "Find the HubSpot owner/user ID for the admin email.
+
+ADMIN EMAIL: {{adminEmail}}
+
+STEP 1: QUERY HUBSPOT OWNER BY EMAIL
+- Use hubspot/Owner tool to query by email
+- Query: {hubspot/Owner {email? \"{{adminEmail}}\"}}
+- This will return the owner record if found
+
+STEP 2: EXTRACT OWNER ID
+- From the owner record, get the 'id' field
+- This is the owner ID (also called user_id in HubSpot)
+
+STEP 3: RETURN THE RESULT
+- If owner found: Return ownerId with the ID value
+- If not found: Return ownerId as null (meeting will be created without owner)
+
+EXAMPLE:
+If adminEmail=\"pratik@fractl.io\" and HubSpot returns Owner with id=\"12345\":
+Return: {\"ownerId\": \"12345\"}
+
+CRITICAL:
+- Query by the actual email address from {{adminEmail}}
+- Return the owner ID, not the email
+- If no owner found, return null",
+  responseSchema agenticcrm.core/OwnerLookupResult,
+  retry agenticcrm.core/classifyRetry,
+  tools [hubspot/Owner]
+}
+
 @public agent createMeeting {
   llm "llm01",
   role "You create HubSpot meetings and associate them with contacts."
@@ -265,6 +311,7 @@ YOU HAVE THESE VALUES AVAILABLE:
 - Contact ID: {{finalContactId}} (this is the actual contact ID to associate)
 - Meeting Title: {{meetingTitle}} (this is the actual title from the email)
 - Meeting Body: {{meetingBody}} (this is the actual summary of the email)
+- Owner ID: {{ownerId}} (this is the HubSpot owner/user ID for the meeting host)
 
 STEP 1: GENERATE CURRENT TIMESTAMP
 - Get current date/time
@@ -276,21 +323,25 @@ Use the hubspot/Meeting tool with:
 - meeting_body: the ACTUAL summary text (NOT the word 'meetingBody')
 - timestamp: the numeric timestamp you generated
 - associated_contacts: the ACTUAL contact ID (NOT the word 'finalContactId')
+- owner: the ACTUAL owner ID (NOT the word 'ownerId') - ONLY if ownerId is not null
 
 EXAMPLE OF WHAT TO CREATE:
-If meetingTitle=\"Fifth meeting notes\" and meetingBody=\"Discussion about onboarding\" and finalContactId=\"350155650790\":
+If meetingTitle=\"Fifth meeting notes\" and meetingBody=\"Discussion about onboarding\" and finalContactId=\"350155650790\" and ownerId=\"12345\":
 {hubspot/Meeting {
   meeting_title \"Fifth meeting notes\",
   meeting_body \"Discussion about onboarding team members and customers to the platform.\",
   timestamp \"1734434400000\",
-  associated_contacts \"350155650790\"
+  associated_contacts \"350155650790\",
+  owner \"12345\"
 }}
 
 CRITICAL:
 - Use the ACTUAL VALUES from the scratchpad, not the placeholder names
 - Do NOT write {{meetingTitle}} - write the actual title
 - Do NOT write {{meetingBody}} - write the actual body text
-- Do NOT write {{finalContactId}} - write the actual ID",
+- Do NOT write {{finalContactId}} - write the actual ID
+- Do NOT write {{ownerId}} - write the actual owner ID
+- If ownerId is null, do NOT include the owner field",
   retry agenticcrm.core/classifyRetry,
   tools [hubspot/Meeting]
 }
@@ -303,7 +354,8 @@ flow contactFlow {
 }
 
 flow meetingFlow {
-  parseEmailContent --> createMeeting
+  parseEmailContent --> findMeetingOwner
+  findMeetingOwner --> createMeeting
 }
 
 flow crmManager {
