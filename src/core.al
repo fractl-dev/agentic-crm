@@ -38,15 +38,6 @@ record MeetingInfo {
     meetingBody String
 }
 
-record OwnerSearchResult {
-  ownerFound Boolean,
-  existingOwnerId String @optional
-}
-
-record OwnerResult {
-    ownerId String
-}
-
 event FindContactByEmail {
     email String
 }
@@ -69,30 +60,6 @@ workflow FindContactByEmail {
             contactFound false
         }}
     }
-}
-
-event FindOwnerByEmail {
-  email String
-}
-
-workflow FindOwnerByEmail {
-  console.log("Searching for owner with email: " + FindOwnerByEmail.email);
-  {hubspot/Owner {email? FindOwnerByEmail.email}} @as foundOwners;
-  console.log("Found owners: " + foundOwners.length);
-
-  if (foundOwners.length > 0) {
-    foundOwners @as [firstOwner];
-    console.log("Owner found - ID: " + firstOwner.id);
-    {OwnerSearchResult {
-        ownerFound true,
-        existingOwnerId firstOwner.id
-      }}
-  } else {
-    console.log("No owner found for: " + FindOwnerByEmail.email);
-    {OwnerSearchResult {
-        ownerFound false
-      }}
-  }
 }
 
 @public agent parseEmailInfo {
@@ -298,31 +265,6 @@ CRITICAL:
   retry agenticcrm.core/classifyRetry
 }
 
-@public agent findMeetingOwner {
-  llm "llm01",
-  role "You search for the HubSpot owner by email address."
-  instruction "Search for the owner with email address {{adminEmail}} in Hubspot.
-
-STEP 1: TRIGGER THE SEARCH
-- Use the agenticcrm.core/FindOwnerByEmail tool with email={{adminEmail}}
-- This will search all HubSpot owners for a matching email
-
-STEP 2: THE TOOL RETURNS
-The FindOwnerByEmail tool returns a OwnerSearchResult with:
-- ownerFound: true/false (whether owner exists)
-- existingOwnerId: the owner ID (if found, otherwise null)
-
-STEP 3: RETURN THE RESULT
-Return the OwnerSearchResult exactly as received from the tool.
-
-CRITICAL:
-- Call agenticcrm.core/FindOwnerByEmail with the email address
-- Return the OwnerSearchResult it provides",
-  responseSchema agenticcrm.core/OwnerSearchResult,
-  retry agenticcrm.core/classifyRetry,
-  tools [agenticcrm.core/FindOwnerByEmail]
-}
-
 @public agent createMeeting {
   llm "llm01",
   role "You create HubSpot meetings and associate them with contacts."
@@ -332,7 +274,6 @@ YOU HAVE THESE VALUES AVAILABLE:
 - Contact ID: {{finalContactId}} (this is the actual contact ID to associate)
 - Meeting Title: {{meetingTitle}} (this is the actual title from the email)
 - Meeting Body: {{meetingBody}} (this is the actual summary of the email)
-- Owner ID: {{existingOwnerId}} (this is the actual HubSpot owner/user ID for the meeting host)
 
 STEP 1: GENERATE CURRENT TIMESTAMP
 - Get current date/time
@@ -344,16 +285,14 @@ Use the hubspot/Meeting tool with:
 - meeting_body: the ACTUAL summary text (NOT the word 'meetingBody')
 - timestamp: the numeric timestamp you generated
 - associated_contacts: the ACTUAL contact ID (NOT the word 'finalContactId')
-- owner: the ACTUAL owner ID (NOT the word 'ownerId') - ONLY if ownerId is not null
 
 EXAMPLE OF WHAT TO CREATE:
-If meetingTitle=\"Fifth meeting notes\" and meetingBody=\"Discussion about onboarding\" and finalContactId=\"350155650790\" and ownerId=\"12345\":
+If meetingTitle=\"Fifth meeting notes\" and meetingBody=\"Discussion about onboarding\" and finalContactId=\"350155650790\":
 {hubspot/Meeting {
   meeting_title \"Fifth meeting notes\",
   meeting_body \"Discussion about onboarding team members and customers to the platform.\",
   timestamp \"1734434400000\",
-  associated_contacts \"350155650790\",
-  owner \"12345\"
+  associated_contacts \"350155650790\"
 }}
 
 CRITICAL:
@@ -361,7 +300,6 @@ CRITICAL:
 - Do NOT write {{meetingTitle}} - write the actual title
 - Do NOT write {{meetingBody}} - write the actual body text
 - Do NOT write {{finalContactId}} - write the actual ID
-- Do NOT write {{ownerId}} - write the actual owner ID
 - If ownerId is null, do NOT include the owner field",
   retry agenticcrm.core/classifyRetry,
   tools [hubspot/Meeting]
@@ -375,8 +313,7 @@ flow contactFlow {
 }
 
 flow meetingFlow {
-  parseEmailContent --> findMeetingOwner
-  findMeetingOwner --> createMeeting
+  parseEmailContent --> createMeeting
 }
 
 flow crmManager {
