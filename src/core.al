@@ -280,7 +280,7 @@ Use the hubspot/Meeting tool with these REQUIRED fields:
 - meeting_end_time: the timestamp + 3600000 (1 hour later)
 - associated_contacts: the ACTUAL contact ID (NOT the word 'finalContactId')
 
-EXAMPLE OF WHAT TO CREATE:
+EXAMPLE OF WHAT TO CREATE DON'T USE THIS EXACT FORMAT:
 If meetingTitle=\"Fifth meeting notes\" and meetingBody=\"Discussion about onboarding\" and finalContactId=\"350155650790\":
 {hubspot/Meeting {
   meeting_title \"Fifth meeting notes\",
