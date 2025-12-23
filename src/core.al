@@ -68,7 +68,7 @@ workflow FindContactByEmail {
 
   MESSAGE FORMAT:
   The message will look like this:
-  'Email sender is: Pratik Karki <pratik@fractl.io>, email recipient is: Ranga Rao <ranga@fractl.io>, email subject is: ...'
+  'Email sender is: Pratik Karki <pratik@fractl.io>, email recipient is: John Doe <john@doe.io>, email subject is: ...'
 
   STEP 1: IDENTIFY WHO IS THE EXTERNAL CONTACT
   - Look for 'Email sender is:' to find the sender
@@ -79,14 +79,14 @@ workflow FindContactByEmail {
 
   STEP 2: EXTRACT EMAIL ADDRESS FROM THE EXTERNAL CONTACT
   - From the external contact field (sender or recipient), extract ONLY the email inside angle brackets <>
-  - Example: 'Ranga Rao <ranga@fractl.io>' → extract 'ranga@fractl.io'
+  - Example: 'James John <james@john.io>' → extract 'james@john.io'
   - Example: 'John Doe <john@example.com>' → extract 'john@example.com'
 
   STEP 3: EXTRACT NAME FROM THE EXTERNAL CONTACT
   - From the external contact field, extract the name BEFORE the angle brackets
-  - Example: 'Ranga Rao <ranga@fractl.io>' → extract 'Ranga Rao'
+  - Example: 'James John <james@john.io>' → extract 'James John'
   - Split the name into firstName and lastName
-  - Example: 'Ranga Rao' → firstName='Ranga', lastName='Rao'
+  - Example: 'James John' → firstName='James', lastName='John'
   - Example: 'John Doe' → firstName='John', lastName='Doe'
 
   STEP 4: RETURN THE EXTRACTED INFORMATION
@@ -96,12 +96,12 @@ workflow FindContactByEmail {
   - Save these info to ContactInfo record as responseSchema
 
   EXAMPLE:
-  Input: 'Email sender is: Pratik Karki <pratik@fractl.io>, email recipient is: Ranga Rao <ranga@fractl.io>...'
+  Input: 'Email sender is: Pratik Karki <pratik@fractl.io>, email recipient is: James John <james@john.io>...'
   - Sender contains pratik@fractl.io → External contact is RECIPIENT
-  - Extract from recipient: 'Ranga Rao <ranga@fractl.io>'
-  - contactEmail = 'ranga@fractl.io'
-  - firstName = 'Ranga'
-  - lastName = 'Rao'
+  - Extract from recipient: 'James John <james@john.io>'
+  - contactEmail = 'james@john.io'
+  - firstName = 'James'
+  - lastName = 'John'
 
   CRITICAL RULES:
   - Extract ONLY - do NOT query or create anything
@@ -214,18 +214,18 @@ CRITICAL:
 
   MESSAGE FORMAT:
   The message will look like this:
-  'Email sender is: ..., email recipient is: ..., email subject is: Sixth meeting notes, and the email body is: Hi Ranga,...'
+  'Email sender is: ..., email recipient is: ..., email subject is: Here's meeting notes, and the email body is: Hi John,...'
 
   STEP 1: EXTRACT EMAIL SUBJECT
   - Find the text that comes AFTER 'email subject is:' and BEFORE ', and the email body is:'
   - This entire text is the meeting title
-  - Example: 'email subject is: Sixth meeting notes of the evening, and the email body is:...'
-    → meetingTitle = 'Sixth meeting notes of the evening'
+  - Example: 'email subject is: Meeting notes of the evening, and the email body is:...'
+    → meetingTitle = 'Meeting notes of the evening'
 
   STEP 2: EXTRACT EMAIL BODY
   - Find the text that comes AFTER 'and the email body is:'
   - This is the full email body text
-  - Example: 'and the email body is: Hi Ranga,... Best, Pratik'
+  - Example: 'and the email body is: Hi John,... Best, Pratik'
     → This entire text is the email body
 
   STEP 3: ANALYZE THE EMAIL BODY AND CREATE SUMMARY
@@ -242,7 +242,9 @@ CRITICAL:
   - Return meetingBody: the summary you created in step 3
 
   EXAMPLE:
-  Input: 'Email sender is: Pratik Karki <pratik@fractl.io>, email recipient is: Ranga Rao <ranga@fractl.io>, email subject is: Project Discussion, and the email body is: Hi Ranga, We discussed the project timeline. Action items: 1. Complete design by Friday. Best, Pratik'
+  Input: 'Email sender is: Pratik Karki <pratik@fractl.io>, email recipient is: John Doe <john@doe.io>,
+  email subject is: Important Project Discussion, and the email body is: Hi John, We discussed the project timeline.
+  Action items: 1. Complete design by Friday. Best, Pratik'
 
   Output:
   - meetingTitle = 'Project Discussion'
