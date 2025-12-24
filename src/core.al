@@ -21,7 +21,9 @@ agentlang/retry classifyRetry {
 record ContactInfo {
     contactEmail String,
     firstName String,
-    lastName String
+    lastName String,
+    meetingTitle String,
+    meetingBody String
 }
 
 record ContactSearchResult {
@@ -31,11 +33,6 @@ record ContactSearchResult {
 
 record ContactResult {
     finalContactId String
-}
-
-record MeetingInfo {
-    meetingTitle String,
-    meetingBody String
 }
 
 record OwnerResult {
@@ -91,11 +88,11 @@ workflow FindOwnerByEmail {
 
 @public agent parseEmailInfo {
   llm "llm01",
-  role "Extract contact information from the email message."
-  instruction "Extract the external contact's email and name from THE MESSAGE YOU RECEIVED.
+  role "Extract contact and meeting information from the email message."
+  instruction "Extract all information from THE MESSAGE YOU RECEIVED.
 
 The message format:
-'Email sender is: Name <email>, email recipient is: Name <email>, email subject is: ...'
+'Email sender is: Name <email>, email recipient is: Name <email>, email subject is: ..., and the email body is: ...'
 
 STEP 1: Find sender text in YOUR MESSAGE
 Locate 'Email sender is:' in THE MESSAGE YOU RECEIVED.
@@ -111,10 +108,21 @@ STEP 3: Choose which text to extract from
 IF sender text contains 'pratik@fractl.io' THEN use recipient text
 ELSE use sender text
 
-STEP 4: Extract data from the chosen text FROM YOUR MESSAGE
+STEP 4: Extract contact data from the chosen text FROM YOUR MESSAGE
 contactEmail = copy EXACTLY the text between < and > from YOUR message
 firstName = extract first word before < from YOUR message
 lastName = extract second word before < from YOUR message
+
+STEP 5: Extract meeting title FROM YOUR MESSAGE
+Find 'email subject is: ' in YOUR message
+Copy everything after it until ', and the email body is:'
+This is meetingTitle
+
+STEP 6: Extract and summarize meeting body FROM YOUR MESSAGE
+Find 'and the email body is: ' in YOUR message
+Copy everything after it
+Read it and write a brief summary
+This is meetingBody
 
 CRITICAL GUARDRAILS:
 - Extract from THE MESSAGE YOU RECEIVED, not from examples
@@ -124,8 +132,8 @@ CRITICAL GUARDRAILS:
 - Do NOT use example data - use ACTUAL data from YOUR message
 
 EXAMPLES (for reference only - DO NOT use this data):
-Example pattern: 'Email sender is: John Doe <john@company.io>, email recipient is: ...'
-Would extract: contactEmail='john@company.io', firstName='John', lastName='Doe'
+Example pattern: 'Email sender is: John Doe <john@company.io>, email recipient is: ..., email subject is: Project Review, and the email body is: Let's discuss...'
+Would extract: contactEmail='john@company.io', firstName='John', lastName='Doe', meetingTitle='Project Review', meetingBody='Discussion about project status'
 
 Your task: Extract from YOUR actual message, not these examples.",
   responseSchema agenticcrm.core/ContactInfo,
@@ -215,25 +223,6 @@ Return exactly what the tool returned.",
   tools [agenticcrm.core/FindOwnerByEmail]
 }
 
-@public agent parseEmailContent {
-  llm "llm01",
-  role "Extract meeting information from the email."
-  instruction "Read your message carefully.
-
-Find the part that says 'email subject is: '
-Copy everything after it until you see ', and the email body is:'
-Save this as meetingTitle
-
-Find the part that says 'and the email body is: '
-Copy everything after it
-Read it and write a brief summary
-Save this as meetingBody
-
-Return meetingTitle and meetingBody",
-  responseSchema agenticcrm.core/MeetingInfo,
-  retry agenticcrm.core/classifyRetry
-}
-
 @public agent createMeeting {
   llm "llm01",
   role "Create a meeting in HubSpot with all required fields."
@@ -299,14 +288,13 @@ flow crmManager {
   findExistingContact --> contactExistsCheck
   contactExistsCheck --> "ContactExists" updateExistingContact
   contactExistsCheck --> "ContactNotFound" createNewContact
-  updateExistingContact --> parseEmailContent
-  createNewContact --> parseEmailContent
-  parseEmailContent --> findOwner
+  updateExistingContact --> findOwner
+  createNewContact --> findOwner
   findOwner --> createMeeting
 }
 
 @public agent crmManager {
-  role "You coordinate the complete CRM workflow: extract contact information, find or create the contact in HubSpot, then extract meeting information and create the meeting with proper associations."
+  role "You coordinate the complete CRM workflow: extract contact and meeting information from the email, find or create the contact in HubSpot, find the owner, and create the meeting with proper associations."
 }
 
 workflow @after create:gmail/Email {
