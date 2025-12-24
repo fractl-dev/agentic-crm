@@ -205,9 +205,9 @@ CRITICAL GUARDRAILS:
 @public agent findOwner {
   llm "llm01",
   role "Find the HubSpot owner."
-  instruction "Call the tool agenticcrm.core/FindOwnerByEmail with email set to pratik@fractl.io
+  instruction "Call agenticcrm.core/FindOwnerByEmail with email=pratik@fractl.io
 
-Return the result from the tool.",
+Return the OwnerResult that the tool provides.",
   responseSchema agenticcrm.core/OwnerResult,
   retry agenticcrm.core/classifyRetry,
   tools [agenticcrm.core/FindOwnerByEmail]
@@ -245,22 +245,26 @@ YOU HAVE AVAILABLE:
 - {{meetingBody}} - the meeting summary
 - {{ownerId}} - the owner ID (may be null)
 
-STEP 1: Generate current timestamp
+STEP 1: Determine owner ID
+If {{ownerId}} is null or not a valid integer, use \"85257652\"
+Otherwise use the value from {{ownerId}}
+
+STEP 2: Generate current timestamp
 Get current date and time and convert to Unix timestamp in milliseconds.
 Example: 1735041600000
 
-STEP 2: Calculate end time
+STEP 3: Calculate end time
 Add 3600000 milliseconds (1 hour) to the timestamp.
 Example: 1735041600000 + 3600000 = 1735045200000
 
-STEP 3: Use the hubspot/Meeting tool with ALL these fields:
+STEP 4: Use the hubspot/Meeting tool with ALL these fields:
 - meeting_title: EXACT value from {{meetingTitle}}
 - meeting_body: EXACT value from {{meetingBody}}
 - timestamp: the Unix milliseconds timestamp you generated
 - meeting_outcome: exactly \"COMPLETED\"
 - meeting_start_time: the Unix milliseconds timestamp you generated
 - meeting_end_time: the timestamp + 3600000
-- owner: value from {{ownerId}} (ONLY if not null - omit if null)
+- owner: the owner ID from STEP 1
 - associated_contacts: EXACT value from {{finalContactId}}
 
 EXAMPLE:
@@ -268,7 +272,7 @@ Input values:
 - meetingTitle = \"API Integration Planning\"
 - meetingBody = \"Discussed REST API architecture and timeline\"
 - finalContactId = \"350155650790\"
-- ownerId = \"89234567\"
+- ownerId = null
 - Current timestamp = 1735041600000
 
 You call the tool with:
@@ -278,14 +282,14 @@ You call the tool with:
 - meeting_outcome: \"COMPLETED\"
 - meeting_start_time: \"1735041600000\"
 - meeting_end_time: \"1735045200000\"
-- owner: \"89234567\"
+- owner: \"85257652\"
 - associated_contacts: \"350155650790\"
 
 CRITICAL GUARDRAILS:
 - Generate fresh timestamps based on CURRENT date/time
 - Use EXACT values from {{variables}} - do not modify
 - All timestamps must be Unix milliseconds as strings
-- If {{ownerId}} is null, omit the owner field completely",
+- Always provide owner field using fallback 85257652 if needed",
   retry agenticcrm.core/classifyRetry,
   tools [hubspot/Meeting]
 }
