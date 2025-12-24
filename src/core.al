@@ -54,19 +54,19 @@ event FindContactByEmail {
 }
 
 workflow FindContactByEmail {
-    console.log("Searching for contact with email: " + FindContactByEmail.email);
+    console.log("=== FindContactByEmail: Searching for: " + FindContactByEmail.email);
     {hubspot/Contact {email? FindContactByEmail.email}} @as foundContacts;
-    console.log("Found contacts: " + foundContacts.length);
+    console.log("=== FindContactByEmail: Found " + foundContacts.length + " contacts");
 
     if (foundContacts.length > 0) {
         foundContacts @as [firstContact];
-        console.log("Contact found - ID: " + firstContact.id);
+        console.log("=== FindContactByEmail: Contact exists - ID: " + firstContact.id);
         {ContactSearchResult {
             contactFound true,
             existingContactId firstContact.id
         }}
     } else {
-        console.log("No contact found for: " + FindContactByEmail.email);
+        console.log("=== FindContactByEmail: No contact found, will create new");
         {ContactSearchResult {
             contactFound false
         }}
