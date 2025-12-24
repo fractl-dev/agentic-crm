@@ -204,15 +204,10 @@ CRITICAL GUARDRAILS:
 
 @public agent findOwner {
   llm "llm01",
-  role "Find the HubSpot owner for pratik@fractl.io."
-  instruction "Search for the owner with email pratik@fractl.io.
+  role "Find the HubSpot owner."
+  instruction "Call the tool agenticcrm.core/FindOwnerByEmail with email set to pratik@fractl.io
 
-Call agenticcrm.core/FindOwnerByEmail with email=\"pratik@fractl.io\"
-
-The tool returns an OwnerResult with:
-- ownerId: the owner ID if found, or null if not found
-
-Return the OwnerResult exactly as received from the tool.",
+Return the result from the tool.",
   responseSchema agenticcrm.core/OwnerResult,
   retry agenticcrm.core/classifyRetry,
   tools [agenticcrm.core/FindOwnerByEmail]
@@ -221,36 +216,20 @@ Return the OwnerResult exactly as received from the tool.",
 @public agent parseEmailContent {
   llm "llm01",
   role "Extract meeting information from the email."
-  instruction "Extract meeting title and body from the PROVIDED MESSAGE.
+  instruction "Parse the message to extract meeting information.
 
-The message you receive contains:
-'..., email subject is: <SUBJECT>, and the email body is: <BODY>'
+Your message contains text in the format:
+Email sender is: ..., email recipient is: ..., email subject is: TITLE_HERE, and the email body is: BODY_HERE
 
-STEP 1: Extract meeting title from THE PROVIDED MESSAGE
-Locate the text 'email subject is:' in THE MESSAGE YOU RECEIVED.
-Read everything after it until you reach ', and the email body is:'
-Copy this text EXACTLY as it appears = meetingTitle
+Task 1: Find the email subject
+Look for the text after 'email subject is: ' and before ', and the email body is:'
+Copy it exactly as meetingTitle
 
-STEP 2: Extract and summarize email body from THE PROVIDED MESSAGE
-Locate the text 'and the email body is:' in THE MESSAGE YOU RECEIVED.
-Read everything that comes after it.
-Create a concise summary focusing on:
-- Main discussion points
-- Key decisions
-- Action items mentioned
-This summary = meetingBody
+Task 2: Summarize the email body
+Look for the text after 'and the email body is: '
+Read all of it and create a brief summary as meetingBody
 
-CRITICAL GUARDRAILS:
-- Extract from THE MESSAGE YOU RECEIVED, not from examples below
-- Copy meetingTitle EXACTLY as it appears in YOUR message
-- Summarize the ACTUAL email body from YOUR message
-- Do NOT use example data - use the REAL message data
-
-EXAMPLES (for reference only - DO NOT use this data):
-If message was: '..., email subject is: Q1 Review, and the email body is: Reviewed quarterly results...'
-Then: meetingTitle = 'Q1 Review', meetingBody = summary of the review
-
-Your task: Extract from the ACTUAL message you received, not these examples.",
+Return meetingTitle and meetingBody.",
   responseSchema agenticcrm.core/MeetingInfo,
   retry agenticcrm.core/classifyRetry
 }
