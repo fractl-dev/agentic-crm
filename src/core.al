@@ -82,85 +82,69 @@ workflow FindOwnerByEmail {
 @public agent parseEmailInfo {
   llm "llm01",
   role "Extract contact and meeting information from the gmail/Email instance."
-  instruction "Extract all information from THE gmail/Email INSTANCE YOU RECEIVED.
+  instruction "You have access to {{message}} which contains a gmail/Email instance.
 
-The message is a gmail/Email instance with this structure:
-{
-  \"AL_INSTANCE\": true,
-  \"name\": \"Email\",
-  \"moduleName\": \"gmail\",
-  \"attributes\": {
-    \"sender\": \"Name <email>\",
-    \"recipients\": \"Name <email>\",
-    \"subject\": \"...\",
-    \"body\": \"...\",
-    \"date\": \"ISO 8601 timestamp\"
-  }
-}
+The {{message}} structure is a JSON object with an 'attributes' field containing:
+- sender: string like 'Name <email@domain.com>'
+- recipients: string like 'Name <email@domain.com>'
+- subject: the email subject line
+- body: the email body content
+- date: ISO 8601 timestamp
 
-STEP 1: Access the sender from attributes
-Read the 'sender' field from the attributes object.
-This contains text like 'Name <email>'.
-This is the sender text.
+YOUR TASK: Parse {{message}} and extract the following information:
 
-STEP 2: Access the recipients from attributes
-Read the 'recipients' field from the attributes object.
-This contains text like 'Name <email>'.
-This is the recipient text.
+STEP 1: Find sender and recipients
+From {{message}}, locate the sender field and recipients field.
+Example: if sender is 'Pratik Karki <pratik@fractl.io>', that's the sender text.
 
-STEP 3: Choose which text to extract contact from
-IF sender text contains 'pratik@fractl.io' THEN use recipient text
-ELSE use sender text
+STEP 2: Determine which contact to extract
+IF sender contains 'pratik@fractl.io' THEN use recipients for contact extraction
+ELSE use sender for contact extraction
 
-STEP 4: Extract contact data from the chosen text
-contactEmail = copy EXACTLY the text between < and > from the chosen text
-firstName = extract first word before < from the chosen text
-lastName = extract second word before < from the chosen text
+STEP 3: Extract contact information from chosen text
+From the chosen text (sender or recipients):
+- contactEmail = extract EXACTLY the email address between < and >
+- firstName = extract the first word before <
+- lastName = extract the second word before <
 
-STEP 5: Extract meeting title from attributes
-Read the 'subject' field from the attributes object.
-This is meetingTitle.
+STEP 4: Extract meeting title
+meetingTitle = copy the EXACT value from the subject field in {{message}}
 
-STEP 6: Extract and summarize meeting body from attributes
-Read the 'body' field from the attributes object.
-Read it and write a brief summary.
-This is meetingBody.
+STEP 5: Summarize meeting body
+Read the body field from {{message}} and write a brief summary.
+meetingBody = your summary of the body content
 
-STEP 7: Extract meeting date from attributes
-Read the 'date' field from the attributes object.
-This contains an ISO 8601 timestamp like '2025-12-31T05:02:35.000Z'.
-Copy it EXACTLY as is.
-This is meetingDate.
+STEP 6: Extract meeting date
+meetingDate = copy the EXACT value from the date field in {{message}}
 
-CRITICAL GUARDRAILS:
-- Access attributes from the gmail/Email instance structure
-- Copy the COMPLETE email address EXACTLY as it appears between < and >
-- Do NOT change or modify the domain
-- Do NOT substitute with different domains
-- Copy the date field EXACTLY as provided in ISO 8601 format
-- Do NOT use example data - use ACTUAL data from the instance
+CRITICAL RULES:
+- Parse the actual {{message}} you receive, not examples
+- Email addresses must be copied EXACTLY as they appear between < and >
+- Do NOT modify domains or email addresses
+- The date must be copied EXACTLY in ISO 8601 format
+- All data comes from {{message}}, not from your knowledge
 
-EXAMPLES (for reference only - DO NOT use this data):
-Example instance:
+EXAMPLE (for format reference only - use your actual {{message}}):
+If {{message}} contains:
 {
   \"attributes\": {
     \"sender\": \"John Doe <john@company.io>\",
-    \"recipients\": \"Admin <pratik@fractl.io>\",
-    \"subject\": \"Project Review\",
-    \"body\": \"Let's discuss the project status and next steps.\",
+    \"recipients\": \"Pratik Karki <pratik@fractl.io>\",
+    \"subject\": \"Project Review Meeting\",
+    \"body\": \"Let's discuss the project status and timeline.\",
     \"date\": \"2025-12-31T10:30:00.000Z\"
   }
 }
 
-Would extract:
-- contactEmail='john@company.io' (sender used because recipient contains pratik@fractl.io)
-- firstName='John'
-- lastName='Doe'
-- meetingTitle='Project Review'
-- meetingBody='Discussion about project status and next steps'
-- meetingDate='2025-12-31T10:30:00.000Z'
-
-Your task: Extract from YOUR actual gmail/Email instance, not these examples.",
+You would extract:
+{
+  \"contactEmail\": \"john@company.io\",
+  \"firstName\": \"John\",
+  \"lastName\": \"Doe\",
+  \"meetingTitle\": \"Project Review Meeting\",
+  \"meetingBody\": \"Discussion about project status and timeline\",
+  \"meetingDate\": \"2025-12-31T10:30:00.000Z\"
+}",
   responseSchema agenticcrm.core/ContactInfo,
   retry agenticcrm.core/classifyRetry
 }
