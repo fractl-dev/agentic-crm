@@ -298,9 +298,7 @@ flow crmManager {
 }
 
 workflow @after create:gmail/Email {
-    "Email sender is: " + gmail/Email.sender + ", email recipient is: " + gmail/Email.recipients + ", email subject is: " + gmail/Email.subject + ", and the email body is: " + gmail/Email.body @as emailCompleteMessage;
+    console.log("Following data arrived of instance: ", gmail/Email);
 
-    console.log("Following is data arrived:", emailCompleteMessage);
-
-    {crmManager {message emailCompleteMessage}}
+    {crmManager {message gmail/Email}}
 }
