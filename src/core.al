@@ -23,7 +23,8 @@ record ContactInfo {
     firstName String,
     lastName String,
     meetingTitle String,
-    meetingBody String
+    meetingBody String,
+    meetingDate String
 }
 
 record ContactSearchResult {
@@ -88,54 +89,86 @@ workflow FindOwnerByEmail {
 
 @public agent parseEmailInfo {
   llm "llm01",
-  role "Extract contact and meeting information from the email message."
-  instruction "Extract all information from THE MESSAGE YOU RECEIVED.
+  role "Extract contact and meeting information from the gmail/Email instance."
+  instruction "Extract all information from THE gmail/Email INSTANCE YOU RECEIVED.
 
-The message format:
-'Email sender is: Name <email>, email recipient is: Name <email>, email subject is: ..., and the email body is: ...'
+The message is a gmail/Email instance with this structure:
+{
+  \"AL_INSTANCE\": true,
+  \"name\": \"Email\",
+  \"moduleName\": \"gmail\",
+  \"attributes\": {
+    \"sender\": \"Name <email>\",
+    \"recipients\": \"Name <email>\",
+    \"subject\": \"...\",
+    \"body\": \"...\",
+    \"date\": \"ISO 8601 timestamp\"
+  }
+}
 
-STEP 1: Find sender text in YOUR MESSAGE
-Locate 'Email sender is:' in THE MESSAGE YOU RECEIVED.
-Read everything after it until the comma.
-This is the sender text from YOUR message.
+STEP 1: Access the sender from attributes
+Read the 'sender' field from the attributes object.
+This contains text like 'Name <email>'.
+This is the sender text.
 
-STEP 2: Find recipient text in YOUR MESSAGE
-Locate 'email recipient is:' in THE MESSAGE YOU RECEIVED.
-Read everything after it until the comma.
-This is the recipient text from YOUR message.
+STEP 2: Access the recipients from attributes
+Read the 'recipients' field from the attributes object.
+This contains text like 'Name <email>'.
+This is the recipient text.
 
-STEP 3: Choose which text to extract from
+STEP 3: Choose which text to extract contact from
 IF sender text contains 'pratik@fractl.io' THEN use recipient text
 ELSE use sender text
 
-STEP 4: Extract contact data from the chosen text FROM YOUR MESSAGE
-contactEmail = copy EXACTLY the text between < and > from YOUR message
-firstName = extract first word before < from YOUR message
-lastName = extract second word before < from YOUR message
+STEP 4: Extract contact data from the chosen text
+contactEmail = copy EXACTLY the text between < and > from the chosen text
+firstName = extract first word before < from the chosen text
+lastName = extract second word before < from the chosen text
 
-STEP 5: Extract meeting title FROM YOUR MESSAGE
-Find 'email subject is: ' in YOUR message
-Copy everything after it until ', and the email body is:'
-This is meetingTitle
+STEP 5: Extract meeting title from attributes
+Read the 'subject' field from the attributes object.
+This is meetingTitle.
 
-STEP 6: Extract and summarize meeting body FROM YOUR MESSAGE
-Find 'and the email body is: ' in YOUR message
-Copy everything after it
-Read it and write a brief summary
-This is meetingBody
+STEP 6: Extract and summarize meeting body from attributes
+Read the 'body' field from the attributes object.
+Read it and write a brief summary.
+This is meetingBody.
+
+STEP 7: Extract meeting date from attributes
+Read the 'date' field from the attributes object.
+This contains an ISO 8601 timestamp like '2025-12-31T05:02:35.000Z'.
+Copy it EXACTLY as is.
+This is meetingDate.
 
 CRITICAL GUARDRAILS:
-- Extract from THE MESSAGE YOU RECEIVED, not from examples
-- Copy the COMPLETE email address EXACTLY as it appears in YOUR message
+- Access attributes from the gmail/Email instance structure
+- Copy the COMPLETE email address EXACTLY as it appears between < and >
 - Do NOT change or modify the domain
 - Do NOT substitute with different domains
-- Do NOT use example data - use ACTUAL data from YOUR message
+- Copy the date field EXACTLY as provided in ISO 8601 format
+- Do NOT use example data - use ACTUAL data from the instance
 
 EXAMPLES (for reference only - DO NOT use this data):
-Example pattern: 'Email sender is: John Doe <john@company.io>, email recipient is: ..., email subject is: Project Review, and the email body is: Let's discuss...'
-Would extract: contactEmail='john@company.io', firstName='John', lastName='Doe', meetingTitle='Project Review', meetingBody='Discussion about project status'
+Example instance:
+{
+  \"attributes\": {
+    \"sender\": \"John Doe <john@company.io>\",
+    \"recipients\": \"Admin <pratik@fractl.io>\",
+    \"subject\": \"Project Review\",
+    \"body\": \"Let's discuss the project status and next steps.\",
+    \"date\": \"2025-12-31T10:30:00.000Z\"
+  }
+}
 
-Your task: Extract from YOUR actual message, not these examples.",
+Would extract:
+- contactEmail='john@company.io' (sender used because recipient contains pratik@fractl.io)
+- firstName='John'
+- lastName='Doe'
+- meetingTitle='Project Review'
+- meetingBody='Discussion about project status and next steps'
+- meetingDate='2025-12-31T10:30:00.000Z'
+
+Your task: Extract from YOUR actual gmail/Email instance, not these examples.",
   responseSchema agenticcrm.core/ContactInfo,
   retry agenticcrm.core/classifyRetry
 }
@@ -232,26 +265,28 @@ YOU HAVE AVAILABLE:
 - {{finalContactId}} - the contact ID to associate
 - {{meetingTitle}} - the meeting title
 - {{meetingBody}} - the meeting summary
+- {{meetingDate}} - the email date in ISO 8601 format (e.g., '2025-12-31T05:02:35.000Z')
 - {{ownerId}} - the owner ID (may be null)
 
 STEP 1: Determine owner ID
 If {{ownerId}} is null or not a valid integer, use \"85257652\"
 Otherwise use the value from {{ownerId}}
 
-STEP 2: Generate current timestamp
-Get current date and time and convert to Unix timestamp in milliseconds.
-Example: 1735041600000
+STEP 2: Convert email date to Unix timestamp
+Take the ISO 8601 date from {{meetingDate}} (e.g., '2025-12-31T05:02:35.000Z')
+Convert it to Unix timestamp in milliseconds.
+Example: '2025-12-31T05:02:35.000Z' converts to 1735620155000
 
 STEP 3: Calculate end time
 Add 3600000 milliseconds (1 hour) to the timestamp.
-Example: 1735041600000 + 3600000 = 1735045200000
+Example: 1735620155000 + 3600000 = 1735623755000
 
 STEP 4: Use the hubspot/Meeting tool with ALL these fields:
 - meeting_title: EXACT value from {{meetingTitle}}
 - meeting_body: EXACT value from {{meetingBody}}
-- timestamp: the Unix milliseconds timestamp you generated
+- timestamp: the Unix milliseconds timestamp from the email date
 - meeting_outcome: exactly \"COMPLETED\"
-- meeting_start_time: the Unix milliseconds timestamp you generated
+- meeting_start_time: the Unix milliseconds timestamp from the email date
 - meeting_end_time: the timestamp + 3600000
 - owner: the owner ID from STEP 1
 - associated_contacts: EXACT value from {{finalContactId}}
@@ -260,22 +295,23 @@ EXAMPLE:
 Input values:
 - meetingTitle = \"API Integration Planning\"
 - meetingBody = \"Discussed REST API architecture and timeline\"
+- meetingDate = \"2025-12-31T05:02:35.000Z\"
 - finalContactId = \"350155650790\"
 - ownerId = null
-- Current timestamp = 1735041600000
+- Converted timestamp = 1735620155000
 
 You call the tool with:
 - meeting_title: \"API Integration Planning\"
 - meeting_body: \"Discussed REST API architecture and timeline\"
-- timestamp: \"1735041600000\"
+- timestamp: \"1735620155000\"
 - meeting_outcome: \"COMPLETED\"
-- meeting_start_time: \"1735041600000\"
-- meeting_end_time: \"1735045200000\"
+- meeting_start_time: \"1735620155000\"
+- meeting_end_time: \"1735623755000\"
 - owner: \"85257652\"
 - associated_contacts: \"350155650790\"
 
 CRITICAL GUARDRAILS:
-- Generate fresh timestamps based on CURRENT date/time
+- Convert the ISO 8601 date from {{meetingDate}} to Unix milliseconds
 - Use EXACT values from {{variables}} - do not modify
 - All timestamps must be Unix milliseconds as strings
 - Always provide owner field using fallback 85257652 if needed",
