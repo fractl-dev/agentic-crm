@@ -1,15 +1,5 @@
 module agenticcrm.core
 
-agentlang/retry classifyRetry {
-  attempts 3,
-  backoff {
-    strategy linear,
-    delay 2,
-    magnitude seconds,
-    factor 2
-  }
-}
-
 record ContactInfo {
     contactEmail String,
     firstName String,
@@ -146,7 +136,7 @@ You would extract:
   \"meetingDate\": \"2025-12-31T10:30:00.000Z\"
 }",
   responseSchema agenticcrm.core/ContactInfo,
-  retry agenticcrm.core/classifyRetry
+  retry classifyRetry
 }
 
 @public agent findExistingContact {
@@ -158,7 +148,7 @@ Call agenticcrm.core/FindContactByEmail with email={{contactEmail}}
 
 Return the ContactSearchResult that the tool provides.",
   responseSchema agenticcrm.core/ContactSearchResult,
-  retry agenticcrm.core/classifyRetry,
+  retry classifyRetry,
   tools [agenticcrm.core/FindContactByEmail]
 }
 
@@ -183,7 +173,7 @@ Return this exact JSON structure:
 
 Replace {{existingContactId}} with the actual ID value from your scratchpad.",
   responseSchema agenticcrm.core/ContactResult,
-  retry agenticcrm.core/classifyRetry,
+  retry classifyRetry,
   tools [hubspot/Contact]
 }
 
@@ -215,7 +205,7 @@ CRITICAL GUARDRAILS:
 - Use the EXACT firstName from {{firstName}} - do not modify it
 - Use the EXACT lastName from {{lastName}} - do not modify it",
   responseSchema agenticcrm.core/ContactResult,
-  retry agenticcrm.core/classifyRetry,
+  retry classifyRetry,
   tools [hubspot/Contact]
 }
 
@@ -228,7 +218,7 @@ Pass: email = pratik@fractl.io
 Step 2: The tool returns an OwnerResult with an ownerId field
 Return exactly what the tool returned.",
   responseSchema agenticcrm.core/OwnerResult,
-  retry agenticcrm.core/classifyRetry,
+  retry classifyRetry,
   tools [agenticcrm.core/FindOwnerByEmail]
 }
 
@@ -291,7 +281,7 @@ CRITICAL GUARDRAILS:
 - Use EXACT values from {{variables}} - do not modify
 - All timestamps must be Unix milliseconds as strings
 - Always provide owner field using fallback 85257652 if needed",
-  retry agenticcrm.core/classifyRetry,
+  retry classifyRetry,
   tools [hubspot/Meeting]
 }
 
