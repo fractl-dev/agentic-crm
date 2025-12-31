@@ -1,13 +1,5 @@
 module agenticcrm.core
 
-{agentlang.ai/LLM {
-    name "llm01",
-    service "openai",
-    config {
-        "model": "gpt-5.2"
-    }
-}, @upsert}
-
 agentlang/retry classifyRetry {
   attempts 3,
   backoff {
