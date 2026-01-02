@@ -31,7 +31,7 @@
       "gmailClientSecret": "#js getLocalEnv('GMAIL_CLIENT_SECRET', '')",
       "gmailRefreshToken": "#js getLocalEnv('GMAIL_REFRESH_TOKEN', '')",
       "gmailPollIntervalMinutes": "#js parseInt(getLocalEnv('GMAIL_POLL_INTERVAL_MINUTES', '15'))",
-      "gmailPollMinutes": "2"
+      "gmailPollMinutes": "#js parseInt(getLocalEnv('GMAIL_POLL_MINUTES', '2'))"
     }
   },
   "hubspot": {
