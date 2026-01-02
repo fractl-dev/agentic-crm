@@ -26,7 +26,6 @@
   },
   "gmail": {
     "gmail/GmailConfig": {
-      "id": "",
       "gmailClientId": "#js getLocalEnv('GMAIL_CLIENT_ID', '')",
       "gmailClientSecret": "#js getLocalEnv('GMAIL_CLIENT_SECRET', '')",
       "gmailRefreshToken": "#js getLocalEnv('GMAIL_REFRESH_TOKEN', '')",
@@ -46,42 +45,12 @@
   "agentlang.ai": [
     {
       "agentlang.ai/LLM": {
-        "name": "sonnet_llm",
-        "service": "anthropic",
-        "config": {
-          "model": "claude-sonnet-4-5",
-          "maxTokens": 21333,
-          "enableThinking": false,
-          "temperature": 0.7,
-          "budgetTokens": 8192,
-          "enablePromptCaching": true,
-          "stream": false,
-          "enableExtendedOutput": true
-        }
-      }
-    },
-    {
-      "agentlang.ai/LLM": {
-        "name": "old_sonnet_llm",
-        "service": "anthropic",
-        "config": {
-          "model": "claude-haiku-4-5",
-          "maxTokens": 21333,
-          "enableThinking": false,
-          "temperature": 0.7,
-          "budgetTokens": 8192,
-          "enablePromptCaching": true,
-          "stream": false,
-          "enableExtendedOutput": true
-        }
-      }
-    },
-    {
-      "agentlang.ai/LLM": {
-        "name": "crmManager_llm",
-        "service": "openai",
-        "config": {}
-      }
+                "name": "llm01",
+                "service": "openai",
+                "config": {
+                    "model": "gpt-5.2"
+                }
+            }
     }
   ]
 }
