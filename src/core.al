@@ -112,9 +112,31 @@ Return JSON:
 @public agent checkIfOwner {
   llm "llm01",
   role "Check if contact email belongs to an owner."
-  instruction "Query hubspot/Owner with email={{contactEmail}}.
-If owner found, return {\"isOwner\": true, \"ownerDetails\": \"Owner: <name>\"}.
-If no owner found, return {\"isOwner\": false}.",
+  instruction "Read {{contactEmail}} from the scratchpad.
+
+STEP 1: Use the hubspot/Owner tool to search
+Query the hubspot/Owner tool with the email from {{contactEmail}}.
+The tool will return a list of owner objects.
+
+STEP 2: Check the results
+If the list has one or more owners:
+- Extract the first owner's firstName and lastName
+- Return: {\"isOwner\": true, \"ownerDetails\": \"Owner: <firstName> <lastName> (<email>)\"}
+
+If the list is empty (no owners found):
+- Return: {\"isOwner\": false}
+
+EXAMPLE 1 - Email belongs to an owner:
+{{contactEmail}} = 'admin@company.com'
+Query returns: [{id: '123', email: 'admin@company.com', firstName: 'John', lastName: 'Doe'}]
+You return: {\"isOwner\": true, \"ownerDetails\": \"Owner: John Doe (admin@company.com)\"}
+
+EXAMPLE 2 - Email is not an owner:
+{{contactEmail}} = 'customer@external.com'
+Query returns: []
+You return: {\"isOwner\": false}
+
+CRITICAL: Execute the hubspot/Owner tool, don't just describe what to do.",
   responseSchema agenticcrm.core/OwnerCheckResult,
   retry classifyRetry,
   tools [hubspot/Owner]
@@ -277,32 +299,14 @@ decision contactExistsCheck {
   }
 }
 
-@public agent updateExistingContact {
-  llm "llm01",
-  role "Return the existing contact ID."
-  instruction "You have available from the scratchpad: {{existingContactId}}
-
-STEP 1: Extract the existing contact ID
-Read {{existingContactId}} from the scratchpad.
-This is the HubSpot contact ID that was found (e.g., '123456789').
-
-STEP 2: Return the result
-Return this exact JSON structure:
-{
-  \"finalContactId\": \"<the contact ID value>\"
+event updateExistingContact {
+    existingContactId String
 }
 
-EXAMPLE:
-If {{existingContactId}} = '123456789'
-You return: {\"finalContactId\": \"123456789\"}
-
-CRITICAL RULES:
-- Use the EXACT value from {{existingContactId}}
-- Do not modify the ID
-- The ID must be a string",
-  responseSchema agenticcrm.core/ContactResult,
-  retry classifyRetry,
-  tools [hubspot/Contact]
+workflow updateExistingContact {
+  {ContactResult {
+    finalContactId updateExistingContact.existingContactId
+  }}
 }
 
 @public agent createNewContact {
@@ -368,35 +372,23 @@ workflow findOwner {
   {agenticcrm.core/FindOwnerByEmail {email ownerEmail}}
 }
 
-@public agent skipProcessing {
-  llm "llm01",
-  role "Return skip status when email is not processed."
-  instruction "The email was filtered out and will not be processed.
-Use the reason from {{reason}}.
-
-Return JSON:
-{
-  \"skipped\": true,
-  \"reason\": <use the exact value from {{reason}}>
-}",
-  responseSchema agenticcrm.core/SkipResult,
-  retry classifyRetry
+event skipProcessing {
+    reason String
 }
 
-@public agent skipOwnerContact {
-  llm "llm01",
-  role "Skip contact creation for owners and proceed to meeting."
-  instruction "The contact email belongs to an owner, so we skip contact creation.
-Return the owner details to use directly.
-
-Return JSON with just a note that contact creation was skipped:
-{
-  \"finalContactId\": null
+workflow skipProcessing {
+  {SkipResult {
+    skipped true,
+    reason skipProcessing.reason
+  }}
 }
 
-Note: This will proceed to meeting creation without a contact association.",
-  responseSchema agenticcrm.core/ContactResult,
-  retry classifyRetry
+event skipOwnerContact {}
+
+workflow skipOwnerContact {
+  {ContactResult {
+    finalContactId null
+  }}
 }
 
 @public agent createMeeting {
