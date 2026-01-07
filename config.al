@@ -46,9 +46,9 @@
     {
       "agentlang.ai/LLM": {
                 "name": "llm01",
-                "service": "openai",
+                "service": "anthropic",
                 "config": {
-                    "model": "gpt-5.2"
+                    "model": "claude-sonnet-4-5"
                 }
             }
     }
