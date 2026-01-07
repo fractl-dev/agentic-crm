@@ -1,15 +1,18 @@
 module agenticcrm.core
 
+entity CRMConfig {
+    id UUID @id @default(uuid()),
+    gmailEmail String,
+    ownerId String
+}
+
 record ContactInfo {
-    senderEmail String,
-    senderFirstName String,
-    senderLastname String,
+    contactEmail String,
+    contactFirstName String,
+    contactLastName String,
     meetingTitle String,
     meetingBody String,
-    meetingDate String,
-    receiverEmail String,
-    receiverFirstName String,
-    receiverLastname String
+    meetingDate String
 }
 
 record ContactSearchResult {
@@ -19,11 +22,6 @@ record ContactSearchResult {
 
 record ContactResult {
     finalContactId String
-}
-
-record OwnerResult {
-    ownerEmail String,
-    ownerId String @optional
 }
 
 record EmailFilterResult {
@@ -51,31 +49,6 @@ workflow FindContactByEmail {
     } else {
         {ContactSearchResult {
             contactFound false
-        }}
-    }
-}
-
-event FindOwnerByEmail {
-    senderEmail String,
-    receiverEmail String
-}
-
-workflow FindOwnerByEmail {
-    {hubspot/Owner {email? FindOwnerByEmail.senderEmail}} @as senderAsFoundOwners;
-
-    {hubspot/Owner {email? FindOwnerByEmail.receiverEmail}} @as receiverAsFoundOwners;
-
-    if (senderAsFoundOwners.length > 0) {
-        senderAsFoundOwners @as [firstOwner];
-        {OwnerResult {
-            ownerEmail FindOwnerByEmail.senderEmail,
-            ownerId firstOwner.id
-        }}
-    } else {
-        receiverAsFoundOwners @as [firstOwner];
-        {OwnerResult {
-            ownerEmail FindOwnerByEmail.receiverEmail,
-            ownerId firstOwner.id
         }}
     }
 }
@@ -124,21 +97,10 @@ decision emailShouldBeProcessed {
   }
 }
 
-@public agent checkIfOwner {
-  llm "sonnet_llm",
-  role "Find the actual hubspot owner between sender and receipient of the email."
-  instruction "Invoke FindOwnerByEmail tool with data from {{contactInfo}}.
-
-You will receive senderEmail and receiverEmail from contactInfo.
-You will need to invoke FindOwnerByEmail tool using these emails.",
-  retry classifyRetry,
-  tools [agenticcrm.core/FindOwnerByEmail]
-}
-
 @public agent parseEmailInfo {
   llm "sonnet_llm",
-  role "Extract contact information, owner information, and meeting details from an email."
-  instruction "You receive a gmail/Email instance in {{message}}.
+  role "Extract contact information and meeting details from an email."
+  instruction "You receive a gmail/Email instance in {{message}} and the user's gmail email in {{gmailEmail}}.
 
 The {{message}} structure is a JSON object with an 'attributes' field containing:
 - sender: string like 'Name <email@domain.com>' or just 'email@domain.com'
@@ -148,21 +110,21 @@ The {{message}} structure is a JSON object with an 'attributes' field containing
 - date: ISO 8601 timestamp
 
 STEP 1: Extract emails and names from {{message}}.attributes
-- From sender: extract email address and name (if 'Name <email>' format, extract both; if just 'email', you can extract firstName from email body saying 'Hi, ' or similar salutations and name)
+- From sender: extract email address and name (if 'Name <email>' format, extract both; if just 'email', extract firstName and lastName from the name)
 - From recipients: same extraction logic
 
-STEP 2: Determine both emails to figure out which is owner and contact for next agent:
-- From sender, you need to only put the email of sender on senderEmail.
-- From receiver, you need to only put the email of receiver on receiverEmail.
+STEP 2: Determine which participant is the CONTACT (not the user):
+- If sender email matches {{gmailEmail}}, then the recipient is the contact
+- If recipient email matches {{gmailEmail}}, then the sender is the contact
+- Extract contactEmail, contactFirstName, contactLastName from the identified contact
 
 STEP 3: Extract meeting details from {{message}}.attributes
 - meetingTitle: exact value from subject field
 - meetingDate: exact value from date field (keep ISO 8601 format)
-- meetingBody: summarize the body of email on descriptive clear structure, if there are things mentioned as action, creation action items with numbering.
+- meetingBody: summarize the body of email in a descriptive clear structure. If there are action items mentioned, create numbered action items.
 
 STEP 4: Return ContactInfo with ACTUAL extracted values:
-- senderEmail, senderFirstname, senderLastname
-- receiverEmail, receiverFirstName, receiverLastname
+- contactEmail, contactFirstName, contactLastName
 - meetingTitle, meetingBody, meetingDate
 
 DO NOT return empty strings - extract actual values from {{message}}.attributes.",
@@ -203,8 +165,8 @@ workflow updateExistingContact {
   role "Create a new contact in HubSpot CRM."
   instruction "Create contact using hubspot/Contact with:
 - email from {{contactEmail}}
-- first_name from {{firstName}}
-- last_name from {{lastName}}
+- first_name from {{contactFirstName}}
+- last_name from {{contactLastName}}
 
 Return finalContactId with the id from the created contact.",
   responseSchema agenticcrm.core/ContactResult,
@@ -212,30 +174,10 @@ Return finalContactId with the id from the created contact.",
   tools [hubspot/Contact]
 }
 
-
-decision contactIsOwner {
-  case (isOwner == true) {
-    SkipContactCreation
-  }
-  case (isOwner == false) {
-    ProceedWithContact
-  }
-}
-
-workflow findOwner {
-  {agenticcrm.core/FindOwnerByEmail {email ownerEmail}}
-}
-
 workflow skipProcessing {
   {SkipResult {
     skipped true,
     reason "Email filtered out (automated sender or newsletter)"
-  }}
-}
-
-workflow skipOwnerContact {
-  {ContactResult {
-    finalContactId null
   }}
 }
 
@@ -252,8 +194,8 @@ Create meeting using hubspot/Meeting with:
 - meeting_outcome: 'COMPLETED'
 - meeting_start_time: Unix milliseconds as string
 - meeting_end_time: start + 3600000 as string
-- owner from {{ownerId}} (null if not available)
-- associated_contacts from {{finalContactId}} (omit if null)
+- owner from {{ownerId}} (use the ownerId provided)
+- associated_contacts from {{finalContactId}} (use the contact ID provided)
 
 All timestamps must be Unix milliseconds as strings.",
   retry classifyRetry,
@@ -264,23 +206,23 @@ flow crmManager {
   filterEmail --> emailShouldBeProcessed
   emailShouldBeProcessed --> "SkipEmail" skipProcessing
   emailShouldBeProcessed --> "ProcessEmail" parseEmailInfo
-  parseEmailInfo --> checkIfOwner
-  checkIfOwner --> contactIsOwner
-  contactIsOwner --> "SkipContactCreation" skipOwnerContact
-  contactIsOwner --> "ProceedWithContact" findExistingContact
+  parseEmailInfo --> findExistingContact
   findExistingContact --> contactExistsCheck
   contactExistsCheck --> "ContactExists" updateExistingContact
   contactExistsCheck --> "ContactNotFound" createNewContact
-  skipOwnerContact --> findOwner
-  updateExistingContact --> findOwner
-  createNewContact --> findOwner
-  findOwner --> createMeeting
+  updateExistingContact --> createMeeting
+  createNewContact --> createMeeting
 }
 
 @public agent crmManager {
-  role "You coordinate the complete CRM workflow: extract contact and meeting information from the email, find or create the contact in HubSpot, find the owner, and create the meeting with proper associations."
+  role "You coordinate the complete CRM workflow: filter the email, extract contact and meeting information, find or create the contact in HubSpot, and create the meeting with proper associations."
 }
 
 workflow @after create:gmail/Email {
-    {crmManager {message gmail/Email}}
+    {agenticcrm.core/CRMConfig} @as [crmConfig];
+    {crmManager {
+        message gmail/Email,
+        gmailEmail crmConfig.gmailEmail,
+        ownerId crmConfig.ownerId
+    }}
 }

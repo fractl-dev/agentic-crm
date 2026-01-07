@@ -33,6 +33,12 @@
       "gmailPollMinutes": "#js parseInt(getLocalEnv('GMAIL_POLL_MINUTES', '2'))"
     }
   },
+  "agenticcrm": {
+    "agenticcrm.core/CRMConfig": {
+      "gmailEmail": "#js getLocalEnv('GMAIL_EMAIL', '')",
+      "ownerId": "#js getLocalEnv('HUBSPOT_OWNER_ID', '')"
+    }
+  },
   "hubspot": {
     "hubspot/HubSpotConfig": {
       "accessToken": "#js getLocalEnv('HUBSPOT_ACCESS_TOKEN', '')",
