@@ -142,16 +142,18 @@ STEP 4: Return ContactInfo with ACTUAL extracted values:
 - contactEmail, contactFirstName, contactLastName
 - meetingTitle, meetingBody, meetingDate
 
+IMPORTANT:
 DO NOT return empty strings - extract actual values from the provided data.
+DO NOT create new data, you must absolutely use the data provided.
 Try to figure out contactFirstName and contactLastName if not provided on sender or recipient from the email body which starts from abbreviation like: Hi, <>",
   responseSchema agenticcrm.core/ContactInfo,
   retry classifyRetry
 }
 
 @public agent findExistingContact {
-  llm "gpt_llm",
+  llm "sonnet_llm",
   role "Search for an existing contact in HubSpot by email address."
-  instruction "Call agenticcrm.core/FindContactByEmail with the exact email from {{contactEmail}}.
+    instruction "IMPORTANT: Call agenticcrm.core/FindContactByEmail with the exact email from {{ContactInfo.contactEmail}}.
 
 Return the result:
 - contactFound: true or false
@@ -172,19 +174,19 @@ decision contactExistsCheck {
 
 workflow updateExistingContact {
   {ContactResult {
-    finalContactId existingContactId
+    finalContactId ContactSearchResult.existingContactId
   }}
 }
 
 @public agent createNewContact {
-  llm "gpt_llm",
+  llm "sonnet_llm",
   role "Create a new contact in HubSpot CRM."
   instruction "Create contact using hubspot/Contact with:
-- email from {{contactEmail}}
-- first_name from {{contactFirstName}}
-- last_name from {{contactLastName}}
+- email from {{Contactinfo.contactEmail}}
+- first_name from {{Contactinfo.contactFirstName}}
+- last_name from {{Contactinfo.contactLastName}}
 
-Invoke the huspot/Contact tool and from it's generated response, only return the id as finalContactId.
+IMPORTANT: Invoke the huspot/Contact tool and from it's generated response, only return the id as finalContactId.
 
 Return finalContactId with the id from the created contact.",
   responseSchema agenticcrm.core/ContactResult,
