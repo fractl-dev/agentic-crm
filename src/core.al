@@ -133,25 +133,38 @@ STEP 1: Extract emails and names from the EmailFilterResult scratchpad:
 - From {{EmailFilterResult.emailSender}}: extract email address and name (if 'Name <email>' format, extract both.)
 - From {{EmailFilterResult.emailRecipients}}: same extraction logic
 
-STEP 2: Determine which participant is the CONTACT (not the user), properly follow this and get it absolutely right:
-- If {{EmailFilterResult.emailSender}} email matches {{EmailFilterResult.gmailOwnerEmail}}, then the {{EmailFilterResult.emailRecipients}} is the contact.
-- If {{EmailFilterResult.emailRecipients}} email matches {{EmailFilterResult.gmailOwnerEmail}}, then the sender is the contact
-- Example: If emailSender is john@something.com and emailRecipients is: sam@something.com and gmailOwnerEmail is: john@something.com, then, contact is sam@something.com and vice-versa.
-- Extract contactEmail, contactFirstName (if present), contactLastName (if present) from the identified contact.
+STEP 2: Determine which participant is the CONTACT (not the user) - USE ONLY THE ACTUAL DATA PROVIDED:
+- The gmail owner email is {{EmailFilterResult.gmailOwnerEmail}} - this person is the USER, NOT the contact
+- CRITICAL: The contactEmail you return MUST NEVER equal {{EmailFilterResult.gmailOwnerEmail}}
+- LOGIC: Compare the actual emails to identify the external contact:
+  * Read the actual value of {{EmailFilterResult.emailSender}}
+  * Read the actual value of {{EmailFilterResult.emailRecipients}}
+  * Read the actual value of {{EmailFilterResult.gmailOwnerEmail}}
+  * If emailSender = gmailOwnerEmail, then the contact is the person in emailRecipients
+  * If emailRecipients = gmailOwnerEmail, then the contact is the person in emailSender
+  * Extract the contact's email, firstName, and lastName from the person who is NOT the gmail owner
+- FINAL VERIFICATION: Confirm contactEmail ≠ {{EmailFilterResult.gmailOwnerEmail}} before returning
 
 STEP 3: Extract meeting details from the EmailFilterResult values:
 - meetingTitle: exact value from {{EmailFilterResult.emailSubject}} field
 - meetingDate: exact value from {{EmailFilterResult.emailDate}} field (keep ISO 8601 format)
 - meetingBody: summarize the {{EmailFilterResult.emailBody}} in a descriptive clear structure. If there are action items mentioned, create numbered action items.
 
-STEP 4: Return ContactInfo with ACTUAL extracted values:
-- contactEmail, contactFirstName, contactLastName
-- meetingTitle, meetingBody, meetingDate
+STEP 4: Return ContactInfo with ACTUAL extracted values from the scratchpad data:
+- contactEmail: the ACTUAL email you extracted (not an example)
+- contactFirstName: the ACTUAL first name you extracted (not an example)
+- contactLastName: the ACTUAL last name you extracted (not an example, can be empty string if not found)
+- meetingTitle: the ACTUAL {{EmailFilterResult.emailSubject}} value (not an example)
+- meetingBody: the ACTUAL summarized {{EmailFilterResult.emailBody}} (not an example)
+- meetingDate: the ACTUAL {{EmailFilterResult.emailDate}} value (not an example)
 
-IMPORTANT:
-DO NOT return empty strings - extract actual values from the provided data.
-DO NOT create new data, you must absolutely use the data provided.
-Try to figure out contactFirstName and contactLastName if not provided on sender or recipient from the email body which starts from abbreviation like: Hi, <>
+CRITICAL RULES - READ CAREFULLY:
+- DO NOT use placeholder values like "sam@something.com" or "Project Discussion"
+- DO NOT use example data - ONLY use the ACTUAL data from EmailFilterResult scratchpad
+- DO NOT return empty strings - extract actual values from the provided data
+- DO NOT create fictional data
+- Extract contactFirstName and contactLastName from the name part of "Name <email>" format
+- If names not in email format, try to find them in the email body (e.g., after "Hi," or in signature)
 
 CRITICAL OUTPUT FORMAT RULES:
 - NEVER wrap your response in markdown code blocks (``` or ``)
@@ -207,14 +220,21 @@ CRITICAL OUTPUT FORMAT RULES:
 @public agent createNewContact {
   llm "gpt_llm",
   role "Create a new contact in HubSpot CRM.",
-  instruction "Create contact using hubspot/Contact with:
-- email from {{Contactinfo.contactEmail}}
-- first_name from {{Contactinfo.contactFirstName}}
-- last_name from {{Contactinfo.contactLastName}}
+  instruction "STEP 1: Verify the email from {{ContactInfo.contactEmail}} is valid and not empty.
 
-IMPORTANT: Invoke the huspot/Contact tool and from it's generated response, only return the id as finalContactId.
+STEP 2: Create contact using hubspot/Contact with:
+- email: use {{ContactInfo.contactEmail}}
+- first_name: use {{ContactInfo.contactFirstName}}
+- last_name: use {{ContactInfo.contactLastName}}
 
-Return finalContactId with the id from the created contact.
+STEP 3: From the hubspot/Contact tool response, extract the 'id' field.
+
+STEP 4: Return ONLY the id as finalContactId.
+
+IMPORTANT: 
+- The contact email must not be empty
+- Extract the exact 'id' value from the created contact response
+- Return it as finalContactId in the ContactResult format
 
 CRITICAL OUTPUT FORMAT RULES:
 - NEVER wrap your response in markdown code blocks (``` or ``)
@@ -236,20 +256,24 @@ workflow skipProcessing {
 @public agent createMeeting {
   llm "sonnet_llm",
   role "Create a meeting record in HubSpot to log the email interaction.",
-  instruction "Convert {{ContactInfo.meetingDate}} from ISO 8601 to Unix milliseconds.
+  instruction "STEP 1: Convert {{ContactInfo.meetingDate}} from ISO 8601 to Unix milliseconds.
 Calculate end time as start + 3600000 (1 hour).
 
-Create meeting using hubspot/Meeting with:
-- meeting_title from {{ContactInfo.meetingTitle}}
-- meeting_body from {{ContactInfo.meetingBody}}
+STEP 2: Create meeting using hubspot/Meeting with these EXACT fields:
+- meeting_title: use {{ContactInfo.meetingTitle}}
+- meeting_body: use {{ContactInfo.meetingBody}}
 - timestamp: Unix milliseconds as string
-- meeting_outcome: 'COMPLETED'
+- meeting_outcome: use the string 'COMPLETED'
 - meeting_start_time: Unix milliseconds as string
-- meeting_end_time: start + 3600000 as string
-- owner from {{EmailFilterResult.hubspotOwnerId}}
-- associated_contacts from {{ContactResult.finalContactId}} (use the contact ID provided)
+- meeting_end_time: start + 3600000 as string (must be a string)
+- owner: use {{EmailFilterResult.hubspotOwnerId}} as string
+- associated_contacts: use {{ContactResult.finalContactId}} as string (this associates the meeting with the contact)
 
-All timestamps must be Unix milliseconds as strings.
+CRITICAL REQUIREMENTS:
+- All timestamp fields (timestamp, meeting_start_time, meeting_end_time) MUST be Unix milliseconds as strings
+- The owner field must be the HubSpot owner ID as a string
+- The associated_contacts field must contain the contact ID from ContactResult.finalContactId
+- Do NOT skip the associated_contacts field - it's required to link the meeting to the contact in HubSpot
 
 CRITICAL OUTPUT FORMAT RULES:
 - NEVER wrap your response in markdown code blocks (``` or ``)
