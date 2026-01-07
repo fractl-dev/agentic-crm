@@ -219,7 +219,7 @@ flow crmManager {
 }
 
 workflow @after create:gmail/Email {
-    {agenticcrm.core/CRMConfig} @as [crmConfig];
+    {agenticcrm.core/CRMConfig? {}} @as [crmConfig];
     {crmManager {
         message gmail/Email,
         gmailEmail crmConfig.gmailEmail,
