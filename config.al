@@ -57,6 +57,15 @@
                     "model": "claude-sonnet-4-5"
                 }
             }
+    },
+    {
+      "agentlang.ai/LLM": {
+                "name": "gpt_llm",
+                "service": "openai",
+                "config": {
+                    "model": "gpt-5.2"
+                }
+            }
     }
   ]
 }
