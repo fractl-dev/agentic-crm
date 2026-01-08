@@ -192,7 +192,7 @@ CRITICAL OUTPUT FORMAT RULES:
 }
 
 @public agent findExistingContact {
-  llm "gpt_llm",
+  llm "sonnet_llm",
   role "Search for an existing contact in HubSpot by email address.",
   instruction "You MUST invoke the agenticcrm.core/FindContactByEmail tool to search for a contact.
 
@@ -203,13 +203,18 @@ STEP 2: Wait for the tool response. It will return a ContactSearchResult with:
 - contactFound: true or false
 - existingContactId: the contact ID if found
 
-STEP 3: Return the tool's exact response.
+STEP 3: Examine the tool's response. If existingContactId is a UUID format (8-4-4-4-12), this is WRONG.
+
+STEP 4: Return the response with the correct ID format.
 
 CRITICAL RULES:
 - You MUST call the FindContactByEmail tool - do NOT skip this step
 - Use the ACTUAL response from the tool
+- The existingContactId should be a SHORT NUMERIC string (like \"401\" or \"8801\"), NOT a UUID
+- If you see a UUID format (like \"c87d3145-bbe1-4241-b51e-3d9ab068dae9\"), report it as an error
+- DO NOT return UUIDs as contact IDs
 - DO NOT make up whether a contact exists
-- DO NOT fabricate contact IDs
+- DO NOT fabricate contact ID like in the example provided, it must be an actual tool response.
 
 CRITICAL OUTPUT FORMAT RULES:
 - NEVER wrap your response in markdown code blocks (``` or ``)
