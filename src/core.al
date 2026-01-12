@@ -177,8 +177,8 @@ CRITICAL RULES - READ CAREFULLY:
 - DO NOT use example data - ONLY use the ACTUAL data from EmailFilterResult scratchpad
 - DO NOT return empty strings - extract actual values from the provided data
 - DO NOT create fictional data
-- Extract contactFirstName and contactLastName from the name part of "Name <email>" format
-- If names not in email format, try to find them in the email body (e.g., after "Hi," or in signature)
+- Extract contactFirstName and contactLastName from the name part of \"Name <email>\" format
+- If names not in email format, try to find them in the email body (e.g., after \"Hi,\" or in signature)
 
 CRITICAL OUTPUT FORMAT RULES:
 - NEVER wrap your response in markdown code blocks (``` or ``)
@@ -229,27 +229,9 @@ flow crmManager {
     emailShouldBeProcessed --> "ProcessEmail" parseEmailInfo
     parseEmailInfo --> {findContactByEmail {email parseEmailInfo.contactEmail}}
     findContactByEmail --> contactExistsCheck
-    contactExistsCheck --> "ContactExists" {
-        createMeeting {
-            meetingTitle parseEmailInfo.meetingTitle,
-            meetingBody parseEmailInfo.meetingBody,
-            meetingDate parseEmailInfo.meetingDate,
-            ownerId EmailFilterResult.hubspotOwnerId,
-            contactId ContactSearchResult.existingContactId
-        }}
-    contactExistsCheck --> "ContactNotFound" {
-        createHubspotContact {
-            email parseEmailInfo.contactEmail,
-            firstName parseEmailInfo.contactFirstName,
-            lastName parseEmailInfo.contactLastName
-        }}
-    createHubspotContact --> {createMeeting {
-        meetingTitle parseEmailInfo.meetingTitle,
-        meetingBody parseEmailInfo.meetingBody,
-        meetingDate parseEmailInfo.meetingDate,
-        hubspotOwnerId EmailFilterResult.hubspotOwnerId,
-        contactId ContactSearchResult.existingContactId
-    }}
+    contactExistsCheck --> "ContactExists" {createMeeting {meetingTitle parseEmailInfo.meetingTitle, meetingBody parseEmailInfo.meetingBody, meetingDate parseEmailInfo.meetingDate, ownerId EmailFilterResult.hubspotOwnerId, contactId ContactSearchResult.existingContactId}}
+    contactExistsCheck --> "ContactNotFound" {createHubspotContact {email parseEmailInfo.contactEmail, firstName parseEmailInfo.contactFirstName, lastName parseEmailInfo.contactLastName}}
+    createHubspotContact --> {createMeeting {meetingTitle parseEmailInfo.meetingTitle, meetingBody parseEmailInfo.meetingBody, meetingDate parseEmailInfo.meetingDate, hubspotOwnerId EmailFilterResult.hubspotOwnerId, contactId ContactSearchResult.existingContactId}}
 }
 
 @public agent crmManager {
