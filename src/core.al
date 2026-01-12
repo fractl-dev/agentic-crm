@@ -74,6 +74,26 @@ workflow createHubspotContact {
     }}
 }
 
+event createMeeting {
+    meetingTitle String,
+    meetingBody String,
+    meetingDate String,
+    ownerId String,
+    contactId String
+}
+
+workflow createMeeting {
+    {hubspot/Meeting {
+        meeting_title createMeeting.meetingTitle,
+        meeting_body createMeeting.meetingBody,
+        meeting_date createMeeting.meetingDate,
+        owner createMeeting.ownerId,
+        associated_contacts createMeeting.contactId
+    }} @as meeting;
+
+    meeting
+}
+
 agent filterEmail {
     llm "sonnet_llm",
     role "Understand email and analyze for CRM processing decisions.",
@@ -205,24 +225,6 @@ workflow skipProcessing {
     }}
 }
 
-event createMeeting {
-    meetingTitle String,
-    meetingBody String,
-    meetingDate String,
-    ownerId String,
-    contactId String
-}
-
-workflow createMeeting {
-    {hubspot/Meeting {
-        meeting_title createMeeting.meetingTitle,
-        meeting_body createMeeting.meetingBody,
-        meeting_date createMeeting.meetingDate,
-        owner createMeeting.ownerId,
-        associated_contacts createMeeting.contactId
-    }}
-}
-
 flow crmManager {
     filterEmail --> emailShouldBeProcessed
     emailShouldBeProcessed --> "SkipEmail" skipProcessing
@@ -231,7 +233,7 @@ flow crmManager {
     findContactByEmail --> contactExistsCheck
     contactExistsCheck --> "ContactExists" {createMeeting {meetingTitle parseEmailInfo.meetingTitle, meetingBody parseEmailInfo.meetingBody, meetingDate parseEmailInfo.meetingDate, ownerId EmailFilterResult.hubspotOwnerId, contactId ContactSearchResult.existingContactId}}
     contactExistsCheck --> "ContactNotFound" {createHubspotContact {email parseEmailInfo.contactEmail, firstName parseEmailInfo.contactFirstName, lastName parseEmailInfo.contactLastName}}
-    createHubspotContact --> {createMeeting {meetingTitle parseEmailInfo.meetingTitle, meetingBody parseEmailInfo.meetingBody, meetingDate parseEmailInfo.meetingDate, hubspotOwnerId EmailFilterResult.hubspotOwnerId, contactId ContactSearchResult.existingContactId}}
+    createHubspotContact --> {createMeeting {meetingTitle parseEmailInfo.meetingTitle, meetingBody parseEmailInfo.meetingBody, meetingDate parseEmailInfo.meetingDate, ownerId EmailFilterResult.hubspotOwnerId, contactId ContactSearchResult.existingContactId}}
 }
 
 @public agent crmManager {
