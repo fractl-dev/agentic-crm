@@ -1,12 +1,14 @@
 module agenticcrm.core
 
-entity CRMConfig {
-    id UUID @id @default(uuid()),
+entity CRMConfig
+{
+    id UUID @id  @default(uuid()),
     gmailEmail String,
     ownerId String
 }
 
-record ContactInfo {
+record ContactInfo
+{
     contactEmail String,
     contactFirstName String,
     contactLastName String,
@@ -15,12 +17,14 @@ record ContactInfo {
     meetingDate String
 }
 
-record ContactSearchResult {
+record ContactSearchResult
+{
     contactFound Boolean,
     existingContactId String @optional
 }
 
-record EmailFilterResult {
+record EmailFilterResult
+{
     shouldProcess Boolean,
     gmailOwnerEmail String @optional,
     hubspotOwnerId String @optional,
@@ -32,30 +36,33 @@ record EmailFilterResult {
     emailThreadId String @optional
 }
 
-record SkipResult {
+record SkipResult
+{
     skipped Boolean,
     reason String
 }
 
-event findContactByEmail {
+event findContactByEmail
+{
     email String
 }
 
 workflow findContactByEmail {
     {hubspot/Contact {email? findContactByEmail.email}} @as foundContacts;
-    if (foundContacts.length > 0) {
-        foundContacts @as [firstContact];
-        {ContactSearchResult {
+   if (foundContacts.length > 0) {
+            foundContacts @as [firstContact];
+    {ContactSearchResult {
             contactFound true,
             existingContactId firstContact.id
         }}
     } else {
-        {ContactSearchResult {
+                {ContactSearchResult {
             contactFound false
         }}
     }
 }
-event createHubspotContact {
+event createHubspotContact
+{
     email String,
     firstName String,
     lastName String
@@ -67,14 +74,13 @@ workflow createHubspotContact {
         first_name createHubspotContact.firstName,
         last_name createHubspotContact.lastName
     }} @as contact;
-
     {ContactSearchResult {
         contactFound true,
         existingContactId contact.id
     }}
 }
-
-event createMeeting {
+event createMeeting
+{
     meetingTitle String,
     meetingBody String,
     meetingDate String,
@@ -90,11 +96,10 @@ workflow createMeeting {
         owner createMeeting.ownerId,
         associated_contacts createMeeting.contactId
     }} @as meeting;
-
     meeting
 }
-
-agent filterEmail {
+agent filterEmail
+{
     llm "sonnet_llm",
     role "Understand email and analyze for CRM processing decisions.",
     instruction "You receive a complete message about an email and also, receive information about gmail email owner and hubspot owner id.
@@ -121,20 +126,20 @@ It shouldn't be processed if:
 IMPORTANT: You must return in this format with proper data extracted.
 if it should be processed.
 {
- \"shouldProcess\": true,
- \"gmailOwnerEmail\": gmail_main_owner_email,
- \"hubspotOwnerId\": hubspot_owner_id,
- \"emailSender\": sender,
- \"emailRecipients\": recipients,
- \"emailSubject\": subject,
- \"emailBody\": body,
- \"emailDate\": date,
- \"emailThreadId\": thread_id
+ "shouldProcess": true,
+ "gmailOwnerEmail": gmail_main_owner_email,
+ "hubspotOwnerId": hubspot_owner_id,
+ "emailSender": sender,
+ "emailRecipients": recipients,
+ "emailSubject": subject,
+ "emailBody": body,
+ "emailDate": date,
+ "emailThreadId": thread_id
 }
 
 else, if it shouldn't be processed, then,
 {
- \"shouldProcess\": false
+ "shouldProcess": false
 }
 
 Don't generate markdown format, just invoke the agenticcrm.core/EmailFilterResult and nothing else.
@@ -144,21 +149,19 @@ CRITICAL OUTPUT FORMAT RULES:
 - NEVER use markdown formatting in your response
 - NEVER add JSON formatting with backticks
 - Do NOT add any markdown syntax, language identifiers, or code fences",
-   retry classifyRetry,
+    retry "classifyRetry",
    responseSchema agenticcrm.core/EmailFilterResult
 }
-
 decision emailShouldBeProcessed {
-    case (shouldProcess == true) {
+      case (shouldProcess == true) {
         ProcessEmail
     }
-
-    case (shouldProcess == false) {
+case (shouldProcess == false) {
         SkipEmail
     }
-}
-
-agent parseEmailInfo {
+    }
+agent parseEmailInfo
+{
     llm "sonnet_llm",
     role "Extract contact information and meeting details from EmailFilterResult.",
     instruction "You have access to understand and parse the data extracted from EmailFilterResult scratchpad.
@@ -193,30 +196,29 @@ STEP 4: Return ContactInfo with ACTUAL extracted values from the scratchpad data
 - meetingDate: the ACTUAL {{EmailFilterResult.emailDate}} value (not an example)
 
 CRITICAL RULES - READ CAREFULLY:
-- DO NOT use placeholder values like \"sam@something.com\" or \"Project Discussion\"
+- DO NOT use placeholder values like "sam@something.com" or "Project Discussion"
 - DO NOT use example data - ONLY use the ACTUAL data from EmailFilterResult scratchpad
 - DO NOT return empty strings - extract actual values from the provided data
 - DO NOT create fictional data
-- Extract contactFirstName and contactLastName from the name part of \"Name <email>\" format
-- If names not in email format, try to find them in the email body (e.g., after \"Hi,\" or in signature)
+- Extract contactFirstName and contactLastName from the name part of "Name <email>" format
+- If names not in email format, try to find them in the email body (e.g., after "Hi," or in signature)
 
 CRITICAL OUTPUT FORMAT RULES:
 - NEVER wrap your response in markdown code blocks (``` or ``)
 - NEVER use markdown formatting in your response
 - NEVER add JSON formatting with backticks
 - Do NOT add any markdown syntax, language identifiers, or code fences",
-    retry classifyRetry,
-    responseSchema agenticcrm.core/ContactInfo
+    retry "classifyRetry",
+   responseSchema agenticcrm.core/ContactInfo
 }
-
 decision contactExistsCheck {
-    case (contactFound == true) {
+      case (contactFound == true) {
         ContactExists
     }
-    case (contactFound == false) {
+case (contactFound == false) {
         ContactNotFound
     }
-}
+    }
 
 workflow skipProcessing {
     {SkipResult {
@@ -224,19 +226,18 @@ workflow skipProcessing {
         reason "Email filtered out (automated sender or newsletter)"
     }}
 }
-
 flow crmManager {
-    filterEmail --> emailShouldBeProcessed
-    emailShouldBeProcessed --> "SkipEmail" skipProcessing
-    emailShouldBeProcessed --> "ProcessEmail" parseEmailInfo
-    parseEmailInfo --> {findContactByEmail {email parseEmailInfo.contactEmail}}
-    findContactByEmail --> contactExistsCheck
-    contactExistsCheck --> "ContactExists" {createMeeting {meetingTitle parseEmailInfo.meetingTitle, meetingBody parseEmailInfo.meetingBody, meetingDate parseEmailInfo.meetingDate, ownerId EmailFilterResult.hubspotOwnerId, contactId ContactSearchResult.existingContactId}}
-    contactExistsCheck --> "ContactNotFound" {createHubspotContact {email parseEmailInfo.contactEmail, firstName parseEmailInfo.contactFirstName, lastName parseEmailInfo.contactLastName}}
-    createHubspotContact --> {createMeeting {meetingTitle parseEmailInfo.meetingTitle, meetingBody parseEmailInfo.meetingBody, meetingDate parseEmailInfo.meetingDate, ownerId EmailFilterResult.hubspotOwnerId, contactId ContactSearchResult.existingContactId}}
-}
-
-@public agent crmManager {
+      filterEmail --> emailShouldBeProcessed
+emailShouldBeProcessed --> "SkipEmail" skipProcessing
+emailShouldBeProcessed --> "ProcessEmail" parseEmailInfo
+parseEmailInfo --> {findContactByEmail {email parseEmailInfo.contactEmail}}
+findContactByEmail --> contactExistsCheck
+contactExistsCheck --> "ContactExists" {createMeeting {meetingTitle parseEmailInfo.meetingTitle, meetingBody parseEmailInfo.meetingBody, meetingDate parseEmailInfo.meetingDate, ownerId EmailFilterResult.hubspotOwnerId, contactId ContactSearchResult.existingContactId}}
+contactExistsCheck --> "ContactNotFound" {createHubspotContact {email parseEmailInfo.contactEmail, firstName parseEmailInfo.contactFirstName, lastName parseEmailInfo.contactLastName}}
+createHubspotContact --> {createMeeting {meetingTitle parseEmailInfo.meetingTitle, meetingBody parseEmailInfo.meetingBody, meetingDate parseEmailInfo.meetingDate, ownerId EmailFilterResult.hubspotOwnerId, contactId ContactSearchResult.existingContactId}}
+    }
+@public agent crmManager
+{
     llm "gpt_llm",
     role "You coordinate the complete CRM workflow: filter the email, extract contact and meeting information, find or create the contact in HubSpot, and create the meeting with proper associations."
 }
