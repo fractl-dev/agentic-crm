@@ -239,7 +239,8 @@ createHubspotContact --> {createMeeting {meetingTitle parseEmailInfo.meetingTitl
 @public agent crmManager
 {
     llm "gpt_llm",
-    role "You coordinate the complete CRM workflow: filter the email, extract contact and meeting information, find or create the contact in HubSpot, and create the meeting with proper associations."
+    role "You coordinate the complete CRM workflow: filter the email, extract contact and meeting information, find or create the contact in HubSpot, and create the meeting with proper associations.",
+    instruction "hello"
 }
 
 workflow @after create:gmail/Email {
